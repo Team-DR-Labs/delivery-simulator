@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcecf7269d72b49b0a91b27bfa996d27, type: 3}
+  m_Name: G27Profile
+  m_EditorClassIdentifier: Assembly-CSharp::DeliveryBot.Input.SteeringWheelProfile
+  steer:
+    controlPath: <Joystick>/stick/x
+    invert: 0
+    deadzone: 0.01
+    wheelRangeDegrees: 900
+    usedRangeDegrees: 270
+  throttle:
+    controlPath: <Joystick>/stick/y
+    restValue: 1
+    pressedValue: -1
+    deadzone: 0.03
+  brake:
+    controlPath: <Joystick>/rz
+    restValue: 1
+    pressedValue: -1
+    deadzone: 0.03
+  clutch:
+    controlPath: <Joystick>/slider
+    restValue: 1
+    pressedValue: -1
+    deadzone: 0.03
+  interactButtonPath: <Joystick>/trigger
+  reverseButtonPath: <Joystick>/button2
+  handbrakeButtonPath: <Joystick>/button3
