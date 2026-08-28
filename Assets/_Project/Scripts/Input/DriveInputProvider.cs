@@ -7,6 +7,8 @@ namespace DeliveryBot.Input
     /// Single entry point for driving input. Builds Input System actions in code so no
     /// .inputactions asset is required. Keyboard and gamepad always work; a steering
     /// wheel is layered on top when a Joystick device is connected, using the profile.
+    /// A legacy Input.GetKey fallback guarantees WASD works even if the Input System
+    /// backend delivers nothing (project uses activeInputHandler = Both).
     /// </summary>
     [DefaultExecutionOrder(-100)]
     public sealed class DriveInputProvider : MonoBehaviour, IDriveInput
@@ -19,12 +21,13 @@ namespace DeliveryBot.Input
         [SerializeField] private float brake;
         [SerializeField] private string activeSource = "none";
 
-        private InputAction _kbSteer, _kbThrottle, _kbBrake, _kbReverse, _kbHandbrake, _kbInteract;
-        private InputAction _wSteer, _wThrottle, _wBrake, _wReverse, _wHandbrake, _wInteract;
+        private InputAction _kbSteer, _kbThrottle, _kbBrake, _kbReverse, _kbHandbrake, _kbInteract, _kbView;
+        private InputAction _wSteer, _wThrottle, _wBrake, _wReverse, _wHandbrake, _wInteract, _wView;
 
         public DriveInputState Current { get; private set; } = DriveInputState.None;
         public string ActiveSourceName => activeSource;
         public bool WheelConnected => Joystick.all.Count > 0;
+        public bool KeyboardPresent => Keyboard.current != null;
 
         private void Awake()
         {
@@ -45,6 +48,7 @@ namespace DeliveryBot.Input
         private void Update()
         {
             var kb = ReadKeyboardAndGamepad();
+            if (!kb.HasAnalogInput) kb = MergeLegacyKeyboard(kb);
             Current = WheelConnected ? Merge(kb, ReadWheel()) : kb;
 
             steer = Current.Steer;
@@ -56,31 +60,17 @@ namespace DeliveryBot.Input
         {
             _kbSteer = new InputAction("Steer", InputActionType.Value);
             _kbSteer.AddCompositeBinding("1DAxis")
-                .With("Negative", "<Keyboard>/a").With("Positive", "<Keyboard>/d")
+                .With("Negative", "<Keyboard>/a").With("Positive", "<Keyboard>/d");
+            _kbSteer.AddCompositeBinding("1DAxis")
                 .With("Negative", "<Keyboard>/leftArrow").With("Positive", "<Keyboard>/rightArrow");
             _kbSteer.AddBinding("<Gamepad>/leftStick/x");
 
-            _kbThrottle = new InputAction("Throttle", InputActionType.Value);
-            _kbThrottle.AddBinding("<Keyboard>/w");
-            _kbThrottle.AddBinding("<Keyboard>/upArrow");
-            _kbThrottle.AddBinding("<Gamepad>/rightTrigger");
-
-            _kbBrake = new InputAction("Brake", InputActionType.Value);
-            _kbBrake.AddBinding("<Keyboard>/s");
-            _kbBrake.AddBinding("<Keyboard>/downArrow");
-            _kbBrake.AddBinding("<Gamepad>/leftTrigger");
-
-            _kbReverse = new InputAction("Reverse", InputActionType.Button);
-            _kbReverse.AddBinding("<Keyboard>/leftShift");
-            _kbReverse.AddBinding("<Gamepad>/buttonWest");
-
-            _kbHandbrake = new InputAction("Handbrake", InputActionType.Button);
-            _kbHandbrake.AddBinding("<Keyboard>/space");
-            _kbHandbrake.AddBinding("<Gamepad>/buttonEast");
-
-            _kbInteract = new InputAction("Interact", InputActionType.Button);
-            _kbInteract.AddBinding("<Keyboard>/e");
-            _kbInteract.AddBinding("<Gamepad>/buttonSouth");
+            _kbThrottle = Axis("Throttle", "<Keyboard>/w", "<Keyboard>/upArrow", "<Gamepad>/rightTrigger");
+            _kbBrake = Axis("Brake", "<Keyboard>/s", "<Keyboard>/downArrow", "<Gamepad>/leftTrigger");
+            _kbReverse = Button("Reverse", "<Keyboard>/leftShift", "<Keyboard>/rightShift", "<Gamepad>/buttonWest");
+            _kbHandbrake = Button("Handbrake", "<Keyboard>/space", "<Gamepad>/buttonEast");
+            _kbInteract = Button("Interact", "<Keyboard>/e", "<Gamepad>/buttonSouth");
+            _kbView = Button("ToggleView", "<Keyboard>/v", "<Gamepad>/rightStickPress");
         }
 
         private void BuildWheelActions()
@@ -92,20 +82,23 @@ namespace DeliveryBot.Input
             _wReverse = Button("WheelReverse", p.reverseButtonPath);
             _wHandbrake = Button("WheelHandbrake", p.handbrakeButtonPath);
             _wInteract = Button("WheelInteract", p.interactButtonPath);
+            _wView = Button("WheelView", p.viewButtonPath);
             wheelProfile = p;
         }
 
-        private static InputAction Axis(string name, string path)
+        private static InputAction Axis(string name, params string[] paths)
         {
             var a = new InputAction(name, InputActionType.Value);
-            if (!string.IsNullOrWhiteSpace(path)) a.AddBinding(path);
+            foreach (var path in paths)
+                if (!string.IsNullOrWhiteSpace(path)) a.AddBinding(path);
             return a;
         }
 
-        private static InputAction Button(string name, string path)
+        private static InputAction Button(string name, params string[] paths)
         {
             var a = new InputAction(name, InputActionType.Button);
-            if (!string.IsNullOrWhiteSpace(path)) a.AddBinding(path);
+            foreach (var path in paths)
+                if (!string.IsNullOrWhiteSpace(path)) a.AddBinding(path);
             return a;
         }
 
@@ -117,10 +110,31 @@ namespace DeliveryBot.Input
                 Mathf.Clamp01(_kbBrake.ReadValue<float>()),
                 _kbReverse.IsPressed(),
                 _kbHandbrake.IsPressed(),
-                _kbInteract.WasPressedThisFrame());
-            if (Mathf.Abs(s.Steer) > 0.01f || s.Throttle > 0.01f || s.Brake > 0.01f)
-                activeSource = Gamepad.current != null && _kbSteer.activeControl?.device is Gamepad ? "gamepad" : "keyboard";
+                _kbInteract.WasPressedThisFrame(),
+                _kbView.WasPressedThisFrame());
+            if (s.HasAnalogInput)
+                activeSource = _kbSteer.activeControl?.device is Gamepad || _kbThrottle.activeControl?.device is Gamepad ? "gamepad" : "keyboard";
             return s;
+        }
+
+        /// <summary>Legacy Input Manager fallback so WASD/arrows always work.</summary>
+        private DriveInputState MergeLegacyKeyboard(DriveInputState s)
+        {
+            var legacySteer = (LegacyKey(KeyCode.D) || LegacyKey(KeyCode.RightArrow) ? 1f : 0f)
+                            - (LegacyKey(KeyCode.A) || LegacyKey(KeyCode.LeftArrow) ? 1f : 0f);
+            var legacyThrottle = LegacyKey(KeyCode.W) || LegacyKey(KeyCode.UpArrow) ? 1f : 0f;
+            var legacyBrake = LegacyKey(KeyCode.S) || LegacyKey(KeyCode.DownArrow) ? 1f : 0f;
+            if (legacySteer == 0f && legacyThrottle == 0f && legacyBrake == 0f) return s;
+
+            activeSource = "keyboard(legacy)";
+            return new DriveInputState(legacySteer, legacyThrottle, legacyBrake,
+                s.Reverse || LegacyKey(KeyCode.LeftShift), s.Handbrake || LegacyKey(KeyCode.Space), s.Interact, s.ToggleView);
+        }
+
+        private static bool LegacyKey(KeyCode key)
+        {
+            try { return UnityEngine.Input.GetKey(key); }
+            catch (System.InvalidOperationException) { return false; } // Input Manager disabled
         }
 
         private DriveInputState ReadWheel()
@@ -132,8 +146,9 @@ namespace DeliveryBot.Input
                 p.brake.Normalize(_wBrake.ReadValue<float>()),
                 _wReverse.IsPressed(),
                 _wHandbrake.IsPressed(),
-                _wInteract.WasPressedThisFrame());
-            if (Mathf.Abs(s.Steer) > 0.01f || s.Throttle > 0.01f || s.Brake > 0.01f)
+                _wInteract.WasPressedThisFrame(),
+                _wView.WasPressedThisFrame());
+            if (s.HasAnalogInput)
                 activeSource = Joystick.current != null ? Joystick.current.displayName : "wheel";
             return s;
         }
@@ -148,13 +163,14 @@ namespace DeliveryBot.Input
                 Mathf.Max(kb.Brake, wheel.Brake),
                 kb.Reverse || wheel.Reverse,
                 kb.Handbrake || wheel.Handbrake,
-                kb.Interact || wheel.Interact);
+                kb.Interact || wheel.Interact,
+                kb.ToggleView || wheel.ToggleView);
         }
 
         private InputAction[] AllActions() => new[]
         {
-            _kbSteer, _kbThrottle, _kbBrake, _kbReverse, _kbHandbrake, _kbInteract,
-            _wSteer, _wThrottle, _wBrake, _wReverse, _wHandbrake, _wInteract
+            _kbSteer, _kbThrottle, _kbBrake, _kbReverse, _kbHandbrake, _kbInteract, _kbView,
+            _wSteer, _wThrottle, _wBrake, _wReverse, _wHandbrake, _wInteract, _wView
         };
     }
 }

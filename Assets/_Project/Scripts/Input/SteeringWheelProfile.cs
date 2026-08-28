@@ -4,7 +4,7 @@ namespace DeliveryBot.Input
 {
     /// <summary>
     /// Per-device steering wheel configuration. Edit this asset (no code change) once the
-    /// real G27 is plugged in and the WheelDebugOverlay shows which axis is which.
+    /// real G27 is plugged in and the WheelDebugOverlay (F1) shows which axis is which.
     /// </summary>
     [CreateAssetMenu(menuName = "DeliveryBot/Steering Wheel Profile", fileName = "SteeringWheelProfile")]
     public sealed class SteeringWheelProfile : ScriptableObject
@@ -19,5 +19,6 @@ namespace DeliveryBot.Input
         public string interactButtonPath = "<Joystick>/trigger";
         public string reverseButtonPath = "<Joystick>/button2";
         public string handbrakeButtonPath = "<Joystick>/button3";
+        public string viewButtonPath = "<Joystick>/button4";
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using DeliveryBot.Input;
 using UnityEngine;
 
@@ -14,33 +15,41 @@ namespace DeliveryBot.Vehicle
         [SerializeField] private DriveInputProvider input;
 
         [Header("Speed (m/s)")]
-        [SerializeField] private float maxForwardSpeed = 6f;
+        [SerializeField] private float maxForwardSpeed = 7f;
         [SerializeField] private float maxReverseSpeed = 2.5f;
-        [SerializeField] private float acceleration = 4f;
+        [SerializeField] private float acceleration = 5f;
         [SerializeField] private float brakeDeceleration = 10f;
-        [SerializeField] private float coastDeceleration = 2f;
+        [SerializeField] private float coastDeceleration = 2.5f;
 
         [Header("Steering")]
-        [SerializeField] private float turnRateDegPerSec = 90f;
+        [SerializeField] private float turnRateDegPerSec = 95f;
         [Tooltip("Steering is scaled by speed so the robot cannot spin in place")]
         [SerializeField] private float minSpeedForFullTurn = 1.5f;
 
         [Header("Ground")]
-        [SerializeField] private float groundCheckDistance = 0.4f;
+        [SerializeField] private float groundCheckDistance = 0.5f;
         [SerializeField] private LayerMask groundMask = ~0;
 
+        [Header("Collisions")]
+        [SerializeField] private float minImpactSpeed = 1.5f;
+        [SerializeField] private float impactCooldown = 0.8f;
+
         private Rigidbody _rb;
+        private float _lastImpactTime = -10f;
 
         public float ForwardSpeed { get; private set; }
         public bool IsGrounded { get; private set; }
         public float MaxForwardSpeed => maxForwardSpeed;
+
+        /// <summary>Raised when the robot bumps into something tagged Traffic/Pedestrian (or any solid at speed).</summary>
+        public event Action<Collision> Impacted;
 
         private void Awake()
         {
             _rb = GetComponent<Rigidbody>();
             _rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
-            if (input == null) input = FindAnyObjectByType<DriveInputProvider>();
+            if (input == null) input = GetComponent<DriveInputProvider>();
         }
 
         private void FixedUpdate()
@@ -78,6 +87,25 @@ namespace DeliveryBot.Vehicle
             var direction = Mathf.Sign(speed); // steering flips when reversing, like a real vehicle
             var yaw = steer * turnRateDegPerSec * speedFactor * direction * dt;
             _rb.MoveRotation(_rb.rotation * Quaternion.Euler(0f, yaw, 0f));
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            if (collision.relativeVelocity.magnitude < minImpactSpeed) return;
+            if (Time.time - _lastImpactTime < impactCooldown) return;
+            _lastImpactTime = Time.time;
+            Impacted?.Invoke(collision);
+        }
+
+        /// <summary>Teleports the robot (used for random spawn).</summary>
+        public void Place(Vector3 position, Quaternion rotation)
+        {
+            if (_rb == null) _rb = GetComponent<Rigidbody>();
+            transform.SetPositionAndRotation(position, rotation);
+            _rb.position = position;
+            _rb.rotation = rotation;
+            _rb.linearVelocity = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
         }
     }
 }

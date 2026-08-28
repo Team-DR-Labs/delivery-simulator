@@ -1,17 +1,35 @@
+using DeliveryBot.CameraSystem;
 using DeliveryBot.Delivery;
+using DeliveryBot.Vehicle;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace DeliveryBot.UI
 {
-    /// <summary>Shows current job, distance, score and a direction arrow toward the target.</summary>
+    /// <summary>Order card, score, speedometer, direction arrow, minimap target blip, flash and toast.</summary>
     public sealed class DeliveryHUD : MonoBehaviour
     {
         [SerializeField] private DeliveryManager manager;
         [SerializeField] private Transform robot;
-        [SerializeField] private Text statusText;
+        [SerializeField] private RobotController robotController;
+        [SerializeField] private CameraRig cameraRig;
+
+        [Header("Texts")]
+        [SerializeField] private Text titleText;
+        [SerializeField] private Text infoText;
         [SerializeField] private Text scoreText;
+        [SerializeField] private Text speedText;
+
+        [Header("Widgets")]
         [SerializeField] private RectTransform arrow;
+        [SerializeField] private RectTransform minimapBlip;
+        [SerializeField] private float minimapRadiusPx = 150f;
+        [SerializeField] private float minimapOrthoSize = 45f;
+        [SerializeField] private Image flash;
+        [SerializeField] private HudToast toast;
+
+        private Color _flashColor;
+        private float _flashAlpha;
 
         private void Awake()
         {
@@ -21,40 +39,75 @@ namespace DeliveryBot.UI
                 var player = GameObject.FindWithTag("Player");
                 robot = player != null ? player.transform : null;
             }
+            if (robotController == null && robot != null) robotController = robot.GetComponent<RobotController>();
+            if (cameraRig == null) cameraRig = FindAnyObjectByType<CameraRig>();
         }
 
         private void Update()
         {
             if (manager == null) return;
-            UpdateText();
-            UpdateArrow();
+            UpdateTexts();
+            UpdateArrowAndBlip();
+            UpdateFlash();
         }
 
-        private void UpdateText()
+        private void UpdateTexts()
         {
-            var dist = manager.DistanceToTarget;
-            var label = manager.Phase switch
+            var name = manager.Target != null ? manager.Target.DisplayName : "-";
+            var title = manager.Phase switch
             {
-                DeliveryPhase.ToPickup => $"픽업하러 가기 → {manager.Target?.DisplayName}",
-                DeliveryPhase.ToDropoff => $"배달 중 → {manager.Target?.DisplayName}",
-                _ => "대기 중"
+                DeliveryPhase.ToPickup => $"📦 픽업 → {name}",
+                DeliveryPhase.ToDropoff => $"🚚 배달 → {name}",
+                _ => "주문 대기 중"
             };
-            if (statusText != null) statusText.text = $"{label}\n{dist:F0} m   {manager.ElapsedThisJob:F0}초";
-            if (scoreText != null) scoreText.text = $"완료 {manager.Completed}건";
+            if (titleText != null) titleText.text = title;
+            if (infoText != null) infoText.text = $"{manager.DistanceToTarget:F0} m   ⏱ {manager.ElapsedThisJob:F0}초";
+            if (scoreText != null)
+                scoreText.text = $"완료 {manager.Completed}건   페널티 {manager.Penalties}회 (+{manager.PenaltyTime:F0}초)   총 {manager.TotalTime:F0}초";
+            if (speedText != null)
+            {
+                var kmh = robotController != null ? Mathf.Abs(robotController.ForwardSpeed) * 3.6f : 0f;
+                var view = cameraRig != null && cameraRig.Mode == ViewMode.FirstPerson ? "1인칭" : "3인칭";
+                speedText.text = $"{kmh:F0} km/h\n[V] {view}";
+            }
         }
 
-        private void UpdateArrow()
+        private void UpdateArrowAndBlip()
         {
-            if (arrow == null || robot == null || manager.Target == null)
+            var hasTarget = robot != null && manager.Target != null;
+            if (arrow != null) arrow.gameObject.SetActive(hasTarget);
+            if (minimapBlip != null) minimapBlip.gameObject.SetActive(hasTarget);
+            if (!hasTarget) return;
+
+            var rel = manager.Target.transform.position - robot.position;
+            rel.y = 0f;
+            var angle = Vector3.SignedAngle(robot.forward, rel, Vector3.up);
+            if (arrow != null) arrow.localRotation = Quaternion.Euler(0f, 0f, -angle);
+
+            if (minimapBlip != null)
             {
-                if (arrow != null) arrow.gameObject.SetActive(false);
-                return;
+                var local = Quaternion.Euler(0f, -robot.eulerAngles.y, 0f) * rel;
+                var px = new Vector2(local.x, local.z) * (minimapRadiusPx / Mathf.Max(1f, minimapOrthoSize));
+                var limit = minimapRadiusPx - 12f;
+                if (px.magnitude > limit) px = px.normalized * limit;
+                minimapBlip.anchoredPosition = px;
             }
-            arrow.gameObject.SetActive(true);
-            var to = manager.Target.transform.position - robot.position;
-            to.y = 0f;
-            var angle = Vector3.SignedAngle(robot.forward, to, Vector3.up);
-            arrow.localRotation = Quaternion.Euler(0f, 0f, -angle);
         }
+
+        private void UpdateFlash()
+        {
+            if (flash == null) return;
+            _flashAlpha = Mathf.MoveTowards(_flashAlpha, 0f, Time.deltaTime * 1.2f);
+            flash.color = new Color(_flashColor.r, _flashColor.g, _flashColor.b, _flashAlpha);
+            flash.raycastTarget = false;
+        }
+
+        public void Flash(Color color)
+        {
+            _flashColor = color;
+            _flashAlpha = color.a;
+        }
+
+        public void ShowToast(string message, Color color) => toast?.Show(message, color);
     }
 }

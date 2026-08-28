@@ -14,9 +14,12 @@ namespace DeliveryBot.Input
         public readonly float Brake;
         public readonly bool Reverse;
         public readonly bool Handbrake;
+        /// <summary>True only on the frame the button went down.</summary>
         public readonly bool Interact;
+        /// <summary>True only on the frame the button went down.</summary>
+        public readonly bool ToggleView;
 
-        public DriveInputState(float steer, float throttle, float brake, bool reverse, bool handbrake, bool interact)
+        public DriveInputState(float steer, float throttle, float brake, bool reverse, bool handbrake, bool interact, bool toggleView)
         {
             Steer = steer;
             Throttle = throttle;
@@ -24,9 +27,12 @@ namespace DeliveryBot.Input
             Reverse = reverse;
             Handbrake = handbrake;
             Interact = interact;
+            ToggleView = toggleView;
         }
 
-        public static DriveInputState None => new DriveInputState(0f, 0f, 0f, false, false, false);
+        public bool HasAnalogInput => Steer != 0f || Throttle > 0f || Brake > 0f;
+
+        public static DriveInputState None => new DriveInputState(0f, 0f, 0f, false, false, false, false);
     }
 
     public interface IDriveInput
