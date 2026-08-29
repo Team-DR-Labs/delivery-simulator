@@ -8,6 +8,7 @@
 2. `Assets/_Project/Scenes/City.unity` 열고 ▶ Play
 3. **키가 안 먹으면 Game 뷰를 한 번 클릭**해서 키보드 포커스를 준다
 4. 씬을 다시 만들고 싶으면 메뉴 `DeliveryBot > Build City Scene`
+5. 패드/휠이 인식되는지 보려면 메뉴 `DeliveryBot > Log Input Devices` (Console에 출력)
 
 ## 조작
 
@@ -15,13 +16,13 @@
 |---|---|---|---|
 | 조향 | A/D, ←/→ | 왼쪽 스틱 | 핸들 축 |
 | 가속 | W, ↑ | RT | 액셀 페달 |
-| 브레이크 | S, ↓ | LT | 브레이크 페달 |
+| 브레이크 → 멈춘 뒤 계속 누르면 후진 | S, ↓ | LT | 브레이크 페달 |
 | 후진(누르고 가속) | Shift | X | button2 |
 | 핸드브레이크 | Space | B | button3 |
 | 시점 전환 (3인칭 ↔ 1인칭) | V | R스틱 클릭 | button4 |
 | 상호작용 | E | A | trigger |
 | 조작법 카드 | H | | |
-| 입력 디버그 오버레이 | F1 | | |
+| 입력 디버그 오버레이 (연결된 모든 장치 표시) | F1 | | |
 | 재시작 | R | | |
 
 ## 게임 루프

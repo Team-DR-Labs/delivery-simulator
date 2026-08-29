@@ -38,7 +38,9 @@ namespace DeliveryBot.Input
             if (provider != null)
             {
                 var c = provider.Current;
-                _sb.Append($"kb={(provider.KeyboardPresent ? "ok" : "NONE")} lastKey={_lastKey} src={provider.ActiveSourceName} ")
+                var pad = provider.GamepadName;
+                var trig = provider.RawTriggers;
+                _sb.Append($"kb={(provider.KeyboardPresent ? "ok" : "NONE")} pad={(pad ?? "none")}{(pad != null ? $" LT={trig.x:F2} RT={trig.y:F2}" : "")} lastKey={_lastKey} src={provider.ActiveSourceName} ")
                    .Append($"steer={c.Steer:F2} thr={c.Throttle:F2} brk={c.Brake:F2} rev={(c.Reverse ? 1 : 0)} hb={(c.Handbrake ? 1 : 0)}  [F1 detail]");
             }
 
@@ -52,6 +54,10 @@ namespace DeliveryBot.Input
 
         private void AppendJoystickDetail()
         {
+            _sb.AppendLine("\n<b>All input devices</b>");
+            foreach (var d in InputSystem.devices)
+                _sb.AppendLine($"  {d.displayName}  layout={d.layout}  {(d is Gamepad ? "[Gamepad]" : d is Joystick ? "[Joystick]" : "")}");
+
             if (Joystick.all.Count == 0)
             {
                 _sb.AppendLine("\nNo joystick / wheel connected. Keyboard: WASD or arrows, Shift=reverse, Space=handbrake, V=view, E=interact");

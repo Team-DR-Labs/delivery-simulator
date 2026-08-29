@@ -28,6 +28,11 @@ namespace DeliveryBot.Input
         public string ActiveSourceName => activeSource;
         public bool WheelConnected => Joystick.all.Count > 0;
         public bool KeyboardPresent => Keyboard.current != null;
+        public string GamepadName => Gamepad.current != null ? Gamepad.current.displayName : null;
+        /// <summary>Raw trigger values for the debug overlay (-1 when no gamepad).</summary>
+        public Vector2 RawTriggers => Gamepad.current != null
+            ? new Vector2(Gamepad.current.leftTrigger.ReadValue(), Gamepad.current.rightTrigger.ReadValue())
+            : new Vector2(-1f, -1f);
 
         private void Awake()
         {
@@ -48,6 +53,7 @@ namespace DeliveryBot.Input
         private void Update()
         {
             var kb = ReadKeyboardAndGamepad();
+            if (!kb.HasAnalogInput) kb = MergeGamepadDirect(kb);
             if (!kb.HasAnalogInput) kb = MergeLegacyKeyboard(kb);
             Current = WheelConnected ? Merge(kb, ReadWheel()) : kb;
 
@@ -115,6 +121,28 @@ namespace DeliveryBot.Input
             if (s.HasAnalogInput)
                 activeSource = _kbSteer.activeControl?.device is Gamepad || _kbThrottle.activeControl?.device is Gamepad ? "gamepad" : "keyboard";
             return s;
+        }
+
+        /// <summary>
+        /// Reads Gamepad.current directly, bypassing action bindings. Guarantees an Xbox/PS pad works
+        /// even if a binding path does not resolve for a particular controller layout.
+        /// </summary>
+        private DriveInputState MergeGamepadDirect(DriveInputState s)
+        {
+            var pad = Gamepad.current;
+            if (pad == null) return s;
+            var steerValue = pad.leftStick.x.ReadValue();
+            if (Mathf.Abs(steerValue) < 0.12f) steerValue = 0f;
+            var rt = pad.rightTrigger.ReadValue();
+            var lt = pad.leftTrigger.ReadValue();
+            if (steerValue == 0f && rt < 0.02f && lt < 0.02f) return s;
+
+            activeSource = "gamepad(direct)";
+            return new DriveInputState(steerValue, rt, lt,
+                s.Reverse || pad.buttonWest.isPressed,
+                s.Handbrake || pad.buttonEast.isPressed,
+                s.Interact || pad.buttonSouth.wasPressedThisFrame,
+                s.ToggleView || pad.rightStickButton.wasPressedThisFrame);
         }
 
         /// <summary>Legacy Input Manager fallback so WASD/arrows always work.</summary>

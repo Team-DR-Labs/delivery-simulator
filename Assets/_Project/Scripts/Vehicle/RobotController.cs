@@ -21,6 +21,9 @@ namespace DeliveryBot.Vehicle
         [SerializeField] private float brakeDeceleration = 10f;
         [SerializeField] private float coastDeceleration = 2.5f;
 
+        [Tooltip("Below this forward speed, holding the brake starts reversing (racing-game style)")]
+        [SerializeField] private float brakeToReverseSpeed = 0.3f;
+
         [Header("Steering")]
         [SerializeField] private float turnRateDegPerSec = 95f;
         [Tooltip("Steering is scaled by speed so the robot cannot spin in place")]
@@ -74,9 +77,19 @@ namespace DeliveryBot.Vehicle
 
             var target = s.Reverse ? -maxReverseSpeed * s.Throttle : maxForwardSpeed * s.Throttle;
             if (s.Brake > 0.01f)
-                return Mathf.MoveTowards(current, 0f, brakeDeceleration * s.Brake * dt);
+            {
+                // Brake while moving forward; once (almost) stopped, keep holding to reverse.
+                if (current > brakeToReverseSpeed)
+                    return Mathf.MoveTowards(current, 0f, brakeDeceleration * s.Brake * dt);
+                return Mathf.MoveTowards(current, -maxReverseSpeed * s.Brake, acceleration * dt);
+            }
             if (s.Throttle > 0.01f)
+            {
+                // Throttle while rolling backwards acts as a brake first.
+                if (current < -brakeToReverseSpeed && !s.Reverse)
+                    return Mathf.MoveTowards(current, 0f, brakeDeceleration * s.Throttle * dt);
                 return Mathf.MoveTowards(current, target, acceleration * dt);
+            }
             return Mathf.MoveTowards(current, 0f, coastDeceleration * dt);
         }
 
