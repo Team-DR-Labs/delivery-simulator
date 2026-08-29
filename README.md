@@ -27,9 +27,10 @@
 
 ## 게임 루프
 
-- 시작할 때 로봇 위치·방향이 랜덤, 30개 상점 중 픽업 지점이 랜덤으로 배정된다(최소 35 m).
-- 픽업하면 70 m 이상 떨어진 배달 지점이 배정되고, 완료하면 다음 주문.
-- 차량/보행자와 부딪히면 +5초, 벽에 세게 부딪히면 +2초 페널티.
+- 시작할 때 로봇 위치·방향이 랜덤. **가게(치킨·피자·카페·분식·편의점·약국·베이커리·꽃집·마트·서점)** 중 하나가 픽업 지점으로 배정된다(최소 35 m).
+- 가게 문 앞(반경 6 m)에 천천히 도착해 **A(패드) / E(키보드)** 를 누르면 픽업. 그러면 70 m 이상 떨어진 **집(주택 또는 아파트 경비실)** 이 배달지로 배정된다.
+- 집 문 앞에서 다시 A/E → 배달 완료, 다음 주문. 화면 아래에 "[A] / [E] 픽업하기" 안내가 뜬다.
+- 차량/보행자와 부딪히면 +5초, 벽에 세게 부딪히면 +2초 페널티. 로봇이 길을 막고 있으면 뒤차가 경적을 울린다.
 
 ## G27 연결 시 할 일
 
@@ -51,8 +52,10 @@ Assets/_Project/
     Delivery/  DeliveryManager, DeliveryPoint, JobPicker(순수 로직)
     Audio/     ProceduralAudio(코드 생성 사운드), RobotAudio, SfxPlayer
     UI/        DeliveryHUD, HudToast, ControlsHint, GameFeedback, ConfettiFactory
-    Editor/    (DeliveryBot.Editor.asmdef) SceneBootstrapper, CityBuilder, PropFactory, RobotFactory, VehicleFactory, DeliveryPointFactory, HudBuilder, BuildKit
+    Editor/    (DeliveryBot.Editor.asmdef) SceneBootstrapper, CityBuilder(블록 유형: 상업/주거/아파트/공원), StorefrontFactory(업종별 파사드),
+               HouseFactory(주택·아파트), PointMarkerFactory, PropFactory, RobotFactory, VehicleFactory, HudBuilder, BuildKit, SnapshotTool
   Tests/EditMode/  AxisMapping, RoadGraph, JobPicker 테스트
+  Tests/PlayMode/  City 씬 실주행(전진/후진/조향), NPC 이동, 픽업→배달 상호작용 테스트
   Scenes/ Prefabs/ Materials/ Settings/   (Build City Scene 생성물)
 ```
 
@@ -64,4 +67,5 @@ $UNITY -batchmode -nographics -quit -projectPath . -executeMethod DeliveryBot.Ed
 $UNITY -batchmode -nographics -projectPath . -runTests -testPlatform EditMode -testResults results.xml
 $UNITY -batchmode -projectPath . -runTests -testPlatform PlayMode -testResults playmode.xml   # City 씬에서 실제 주행 검증
 $UNITY -batchmode -nographics -quit -projectPath . -buildWindows64Player Builds/Windows/DeliveryBotSim.exe
+$UNITY -batchmode -quit -projectPath . -executeMethod DeliveryBot.EditorTools.SnapshotTool.Capture -snapshotDir Snapshots   # 가게/집/거리 PNG 캡처
 ```

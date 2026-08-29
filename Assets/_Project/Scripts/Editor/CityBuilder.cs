@@ -1,12 +1,15 @@
 using System.Collections.Generic;
+using DeliveryBot.Delivery;
 using DeliveryBot.World;
 using UnityEngine;
 
 namespace DeliveryBot.EditorTools
 {
+    public enum BlockType { Park, Commercial, Residential, Apartment }
+
     /// <summary>
-    /// Builds ground, roads, crosswalks, sidewalk slabs, buildings with window bands, parks and props
-    /// for the whole grid. Returns the set of park blocks so storefronts are not placed there.
+    /// Builds ground, roads, crosswalks, sidewalks and every block (shops, houses, apartments, parks) plus props.
+    /// Returns all delivery points (shops = pickup, homes = drop-off).
     /// </summary>
     public static class CityBuilder
     {
@@ -18,7 +21,21 @@ namespace DeliveryBot.EditorTools
             new Color(0.84f, 0.74f, 0.66f)
         };
 
-        public static HashSet<(int, int)> Build(Transform parent, RoadGraph g, System.Random rng, float sidewalkHeight, float parkChance = 0.15f)
+        /// <summary>No prop (tree, lamp, bench, bin, hydrant) may stand this close to a doorstep.</summary>
+        private const float KeepClearRadius = 4.5f;
+
+        private static bool IsClear(Vector3 pos, List<DeliveryPoint> points)
+        {
+            foreach (var p in points)
+            {
+                var d = p.transform.position - pos;
+                d.y = 0f;
+                if (d.sqrMagnitude < KeepClearRadius * KeepClearRadius) return false;
+            }
+            return true;
+        }
+
+        public static List<DeliveryPoint> Build(Transform parent, Transform pointParent, RoadGraph g, System.Random rng, float sidewalkHeight)
         {
             var ground = BuildKit.Mat("Ground", new Color(0.5f, 0.62f, 0.42f));
             var road = BuildKit.Mat("Road", new Color(0.2f, 0.2f, 0.22f));
@@ -30,10 +47,11 @@ namespace DeliveryBot.EditorTools
             var buildingMats = new Material[Palette.Length];
             for (var i = 0; i < Palette.Length; i++) buildingMats[i] = BuildKit.Mat($"Building_{i}", Palette[i]);
             PropFactory.LoadMaterials();
+            StorefrontFactory.ResetNames();
+            HouseFactory.ResetCounters();
 
             var half = g.Half;
             var total = g.Blocks * g.Pitch + g.RoadWidth;
-
             var groundGo = GameObject.CreatePrimitive(PrimitiveType.Plane);
             groundGo.name = "Ground";
             groundGo.isStatic = true;
@@ -43,31 +61,49 @@ namespace DeliveryBot.EditorTools
 
             BuildRoads(parent, g, road, stripe, half, total);
 
-            var parks = new HashSet<(int, int)>();
+            var points = new List<DeliveryPoint>();
             var blocks = BuildKit.Node("Blocks", parent, Vector3.zero, isStatic: true).transform;
             var props = BuildKit.Node("Props", parent, Vector3.zero, isStatic: true).transform;
             for (var bx = 0; bx < g.Blocks; bx++)
             for (var bz = 0; bz < g.Blocks; bz++)
             {
-                var isPark = rng.NextDouble() < parkChance;
-                if (isPark) parks.Add((bx, bz));
+                var type = PickType(rng);
                 var c = g.BlockCenter(bx, bz);
-                var slab = BuildKit.Prim(PrimitiveType.Cube, isPark ? "ParkSlab" : "Sidewalk", blocks, c + Vector3.up * (sidewalkHeight * 0.5f),
+                var blockPoints = new List<DeliveryPoint>();
+                var blockNode = BuildKit.Node($"Block_{bx}_{bz}_{type}", blocks, Vector3.zero, isStatic: true).transform;
+                BuildKit.Prim(PrimitiveType.Cube, "Sidewalk", blockNode, c + Vector3.up * (sidewalkHeight * 0.5f),
                     new Vector3(g.BlockSize, sidewalkHeight, g.BlockSize), sidewalk, keepCollider: true, isStatic: true);
-                if (isPark)
+
+                switch (type)
                 {
-                    var inner = g.BlockSize - g.SidewalkWidth * 2f;
-                    BuildKit.Prim(PrimitiveType.Cube, "Lawn", slab.transform.parent, c + Vector3.up * (sidewalkHeight + 0.01f),
-                        new Vector3(inner, 0.02f, inner), grass, isStatic: true);
-                    BuildPark(props, g, bx, bz, rng, sidewalkHeight);
+                    case BlockType.Park:
+                        var inner = g.BlockSize - g.SidewalkWidth * 2f;
+                        BuildKit.Prim(PrimitiveType.Cube, "Lawn", blockNode, c + Vector3.up * (sidewalkHeight + 0.01f), new Vector3(inner, 0.02f, inner), grass, isStatic: true);
+                        BuildPark(props, g, bx, bz, rng, sidewalkHeight);
+                        break;
+                    case BlockType.Commercial:
+                        blockPoints.AddRange(BuildCommercial(blockNode, pointParent, g, bx, bz, rng, buildingMats, window, roofProp, sidewalkHeight));
+                        break;
+                    case BlockType.Residential:
+                        blockPoints.AddRange(HouseFactory.ResidentialBlock(blockNode, pointParent, g, bx, bz, sidewalkHeight, rng));
+                        break;
+                    case BlockType.Apartment:
+                        blockPoints.Add(HouseFactory.ApartmentBlock(blockNode, pointParent, g, bx, bz, sidewalkHeight, rng));
+                        break;
                 }
-                else
-                {
-                    BuildBuildings(blocks, g, bx, bz, rng, buildingMats, window, roofProp, sidewalkHeight);
-                }
-                BuildBlockProps(props, g, bx, bz, rng, sidewalkHeight);
+                points.AddRange(blockPoints);
+                BuildBlockProps(props, g, bx, bz, rng, sidewalkHeight, blockPoints);
             }
-            return parks;
+            return points;
+        }
+
+        private static BlockType PickType(System.Random rng)
+        {
+            var r = rng.NextDouble();
+            if (r < 0.12) return BlockType.Park;
+            if (r < 0.24) return BlockType.Apartment;
+            if (r < 0.62) return BlockType.Commercial;
+            return BlockType.Residential;
         }
 
         private static void BuildRoads(Transform parent, RoadGraph g, Material road, Material stripe, float half, float total)
@@ -80,14 +116,13 @@ namespace DeliveryBot.EditorTools
                 BuildKit.Prim(PrimitiveType.Cube, "RoadEW", roads, new Vector3(0f, 0.01f, line), new Vector3(total, 0.02f, g.RoadWidth), road, isStatic: true);
             }
 
-            // Centre dashes along each edge + crosswalk stripes at every intersection approach.
             var marks = BuildKit.Node("RoadMarks", parent, Vector3.zero, isStatic: true).transform;
             foreach (var n in g.AllNodes())
             {
                 var p = g.NodePosition(n);
                 foreach (var m in g.Neighbors(n))
                 {
-                    if (m.I < n.I || m.J < n.J) continue; // each edge once
+                    if (m.I < n.I || m.J < n.J) continue;
                     var dir = g.EdgeDirection(n, m);
                     var right = Vector3.Cross(Vector3.up, dir);
                     for (var d = g.RoadWidth * 0.5f + 4f; d < g.Pitch - g.RoadWidth * 0.5f - 3f; d += 4f)
@@ -101,7 +136,7 @@ namespace DeliveryBot.EditorTools
 
         private static void Crosswalk(Transform parent, Vector3 center, Vector3 dir, Vector3 right, float roadWidth, Material stripe)
         {
-            var count = 7;
+            const int count = 7;
             var spacing = (roadWidth - 2f) / (count - 1);
             for (var i = 0; i < count; i++)
             {
@@ -111,9 +146,11 @@ namespace DeliveryBot.EditorTools
             }
         }
 
-        private static void BuildBuildings(Transform parent, RoadGraph g, int bx, int bz, System.Random rng,
+        /// <summary>2x2 mid-rise buildings; each gets one storefront on a street-facing wall with a pickup point on the sidewalk.</summary>
+        private static List<DeliveryPoint> BuildCommercial(Transform parent, Transform pointParent, RoadGraph g, int bx, int bz, System.Random rng,
             Material[] mats, Material window, Material roofProp, float sidewalkHeight)
         {
+            var points = new List<DeliveryPoint>();
             var c = g.BlockCenter(bx, bz);
             var inner = g.BlockSize - g.SidewalkWidth * 2f;
             var gap = 1.6f;
@@ -124,13 +161,13 @@ namespace DeliveryBot.EditorTools
             {
                 var floors = 2 + (int)(Mathf.Pow((float)rng.NextDouble(), 1.6f) * 8f);
                 var h = floors * 3f;
-                var w = footprint - (float)rng.NextDouble() * 1.5f;
-                var d = footprint - (float)rng.NextDouble() * 1.5f;
+                var w = footprint - (float)rng.NextDouble() * 1.0f;
+                var d = footprint - (float)rng.NextDouble() * 1.0f;
                 var pos = c + new Vector3(sx * offset, sidewalkHeight, sz * offset);
                 var b = BuildKit.Node($"Building_{bx}_{bz}_{sx}_{sz}", parent, pos, isStatic: true);
                 var mat = mats[rng.Next(mats.Length)];
                 BuildKit.Prim(PrimitiveType.Cube, "Walls", b.transform, new Vector3(0f, h * 0.5f, 0f), new Vector3(w, h, d), mat, keepCollider: true, isStatic: true);
-                for (var f = 0; f < floors; f++)
+                for (var f = 1; f < floors; f++)
                     BuildKit.Prim(PrimitiveType.Cube, "Windows", b.transform, new Vector3(0f, f * 3f + 1.9f, 0f), new Vector3(w + 0.04f, 1.1f, d + 0.04f), window, isStatic: true);
                 BuildKit.Prim(PrimitiveType.Cube, "Parapet", b.transform, new Vector3(0f, h + 0.15f, 0f), new Vector3(w + 0.3f, 0.3f, d + 0.3f), mat, isStatic: true);
                 var roll = rng.NextDouble();
@@ -138,7 +175,17 @@ namespace DeliveryBot.EditorTools
                     BuildKit.Prim(PrimitiveType.Cube, "AC", b.transform, new Vector3(w * 0.25f, h + 0.7f, d * 0.2f), new Vector3(1.6f, 1.2f, 1.2f), roofProp, isStatic: true);
                 else if (roll < 0.6)
                     BuildKit.Prim(PrimitiveType.Cylinder, "Tank", b.transform, new Vector3(-w * 0.25f, h + 1.2f, -d * 0.2f), new Vector3(1.6f, 1.2f, 1.6f), roofProp, isStatic: true);
+
+                // Storefront on one of the two street-facing walls.
+                var useX = rng.NextDouble() < 0.5;
+                var facing = useX ? new Vector3(sx, 0f, 0f) : new Vector3(0f, 0f, sz);
+                var wallCenter = pos + facing * (useX ? w * 0.5f : d * 0.5f);
+                var wallWidth = useX ? d : w;
+                var curb = g.BlockSize * 0.5f - g.SidewalkWidth * 0.4f;
+                var pointPos = (useX ? new Vector3(c.x + sx * curb, sidewalkHeight, pos.z) : new Vector3(pos.x, sidewalkHeight, c.z + sz * curb));
+                points.Add(StorefrontFactory.Attach(b.transform, wallCenter, facing, wallWidth, pointParent, pointPos, rng));
             }
+            return points;
         }
 
         private static void BuildPark(Transform parent, RoadGraph g, int bx, int bz, System.Random rng, float sidewalkHeight)
@@ -155,28 +202,32 @@ namespace DeliveryBot.EditorTools
             PropFactory.Bench(parent, c + new Vector3(0f, sidewalkHeight, -inner * 0.5f), 0f);
         }
 
-        private static void BuildBlockProps(Transform parent, RoadGraph g, int bx, int bz, System.Random rng, float sidewalkHeight)
+        private static void BuildBlockProps(Transform parent, RoadGraph g, int bx, int bz, System.Random rng, float sidewalkHeight, List<DeliveryPoint> keepClear)
         {
             var c = g.BlockCenter(bx, bz);
             var edge = g.BlockSize * 0.5f - g.SidewalkWidth * 0.5f;
             var y = sidewalkHeight;
-
-            // Trees along each side, lamps at two opposite corners, a few small items.
             for (var side = 0; side < 4; side++)
             {
                 var normal = RoadGraph.SideNormal(side);
                 var along = Vector3.Cross(Vector3.up, normal);
                 for (var t = -edge + 4f; t <= edge - 4f; t += 7f)
                 {
-                    if (rng.NextDouble() < 0.25) continue;
-                    PropFactory.Tree(parent, c + normal * edge + along * t + Vector3.up * y, rng);
+                    if (rng.NextDouble() < 0.35) continue;
+                    var pos = c + normal * edge + along * t + Vector3.up * y;
+                    if (IsClear(pos, keepClear)) PropFactory.Tree(parent, pos, rng);
                 }
-                if (rng.NextDouble() < 0.35) PropFactory.TrashBin(parent, c + normal * edge + along * (edge - 2f) + Vector3.up * y);
-                if (rng.NextDouble() < 0.25) PropFactory.Hydrant(parent, c + normal * (edge + 0.5f) + along * 1.5f + Vector3.up * y);
-                if (rng.NextDouble() < 0.3) PropFactory.Bench(parent, c + normal * (edge - 0.6f) + along * ((float)rng.NextDouble() * 6f - 3f) + Vector3.up * y, Quaternion.LookRotation(normal).eulerAngles.y);
+                var bin = c + normal * edge + along * (edge - 2f) + Vector3.up * y;
+                if (rng.NextDouble() < 0.35 && IsClear(bin, keepClear)) PropFactory.TrashBin(parent, bin);
+                var hydrant = c + normal * (edge + 0.5f) + along * 1.5f + Vector3.up * y;
+                if (rng.NextDouble() < 0.25 && IsClear(hydrant, keepClear)) PropFactory.Hydrant(parent, hydrant);
+                var bench = c + normal * (edge - 0.6f) + along * ((float)rng.NextDouble() * 6f - 3f) + Vector3.up * y;
+                if (rng.NextDouble() < 0.3 && IsClear(bench, keepClear)) PropFactory.Bench(parent, bench, Quaternion.LookRotation(normal).eulerAngles.y);
             }
-            PropFactory.StreetLamp(parent, c + new Vector3(edge, y, edge), Vector3.forward + Vector3.right);
-            PropFactory.StreetLamp(parent, c + new Vector3(-edge, y, -edge), Vector3.back + Vector3.left);
+            var lampA = c + new Vector3(edge, y, edge);
+            var lampB = c + new Vector3(-edge, y, -edge);
+            if (IsClear(lampA, keepClear)) PropFactory.StreetLamp(parent, lampA, Vector3.forward + Vector3.right);
+            if (IsClear(lampB, keepClear)) PropFactory.StreetLamp(parent, lampB, Vector3.back + Vector3.left);
         }
     }
 }

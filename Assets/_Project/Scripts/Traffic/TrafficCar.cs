@@ -15,7 +15,8 @@ namespace DeliveryBot.Traffic
         [SerializeField] private float braking = 9f;
         [SerializeField] private float halfLength = 2.2f;
         [Tooltip("Half extents of the sensing box in front of the bumper; z = half of the look-ahead distance")]
-        [SerializeField] private Vector3 senseHalfExtents = new Vector3(1.3f, 0.8f, 3.5f);
+        [SerializeField] private Vector3 senseHalfExtents = new Vector3(1.0f, 0.8f, 3.5f);
+        [SerializeField] private float hornAfterBlockedSeconds = 2.5f;
 
         private Rigidbody _rb;
         private Collider _self;
@@ -25,6 +26,8 @@ namespace DeliveryBot.Traffic
         private float _speed;
         private System.Random _rng;
         private readonly Collider[] _hits = new Collider[8];
+        private float _blockedSince = -1f;
+        private bool _honked;
 
         public bool IsBlocked { get; private set; }
 
@@ -51,7 +54,8 @@ namespace DeliveryBot.Traffic
         private void FixedUpdate()
         {
             if (_graph == null) return;
-            IsBlocked = SomethingAhead();
+            IsBlocked = SomethingAhead(out var blockedByRobot);
+            UpdateHorn(blockedByRobot);
             var target = IsBlocked ? 0f : cruiseSpeed;
             var rate = target < _speed ? braking : acceleration;
             _speed = Mathf.MoveTowards(_speed, target, rate * Time.fixedDeltaTime);
@@ -72,18 +76,32 @@ namespace DeliveryBot.Traffic
             _rb.MoveRotation(Quaternion.Slerp(_rb.rotation, rot, Time.fixedDeltaTime * 6f));
         }
 
-        private bool SomethingAhead()
+        private bool SomethingAhead(out bool robot)
         {
+            robot = false;
             var center = transform.position + transform.forward * (halfLength + senseHalfExtents.z) + Vector3.up * 0.8f;
             var count = Physics.OverlapBoxNonAlloc(center, senseHalfExtents, _hits, transform.rotation, ~0, QueryTriggerInteraction.Ignore);
+            var blocked = false;
             for (var i = 0; i < count; i++)
             {
                 var c = _hits[i];
-                if (c == _self || c.attachedRigidbody == null) continue;
-                if (c.attachedRigidbody == _rb) continue;
-                return true;
+                if (c == _self || c.attachedRigidbody == null || c.attachedRigidbody == _rb) continue;
+                blocked = true;
+                if (c.attachedRigidbody.CompareTag("Player")) robot = true;
             }
-            return false;
+            return blocked;
+        }
+
+        /// <summary>Honk once when the player has been blocking us for a while.</summary>
+        private void UpdateHorn(bool blockedByRobot)
+        {
+            if (!blockedByRobot) { _blockedSince = -1f; _honked = false; return; }
+            if (_blockedSince < 0f) _blockedSince = Time.time;
+            if (!_honked && Time.time - _blockedSince > hornAfterBlockedSeconds)
+            {
+                _honked = true;
+                DeliveryBot.Audio.SfxPlayer.Instance?.PlayHorn();
+            }
         }
 
         /// <summary>Tints every renderer named "Paint" (body panels) without creating material instances.</summary>

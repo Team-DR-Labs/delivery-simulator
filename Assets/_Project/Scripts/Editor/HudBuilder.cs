@@ -57,6 +57,13 @@ namespace DeliveryBot.EditorTools
             var speed = Text(root, "Speed", font, 30, new Vector2(1f, 0f), new Vector2(-30f, 30f), new Vector2(260f, 80f));
             speed.alignment = TextAnchor.LowerRight;
 
+            // Interaction prompt (above the arrow).
+            var prompt = Text(root, "Prompt", font, 40, new Vector2(0.5f, 0f), new Vector2(0f, 230f), new Vector2(900f, 60f), FontStyle.Bold);
+            prompt.alignment = TextAnchor.MiddleCenter;
+            prompt.color = new Color(1f, 0.95f, 0.6f);
+            prompt.gameObject.AddComponent<UiPulse>();
+            BuildKit.SetField(prompt.GetComponent<UiPulse>(), "amplitude", 0.04f);
+
             // Toast (centre).
             var toastGo = new GameObject("Toast", typeof(RectTransform), typeof(CanvasGroup));
             toastGo.transform.SetParent(root, false);
@@ -83,6 +90,7 @@ namespace DeliveryBot.EditorTools
             BuildKit.SetField(hud, "infoText", info);
             BuildKit.SetField(hud, "scoreText", score);
             BuildKit.SetField(hud, "speedText", speed);
+            BuildKit.SetField(hud, "promptText", prompt);
             BuildKit.SetField(hud, "arrow", arrow.rectTransform);
             BuildKit.SetField(hud, "minimapBlip", blip.rectTransform);
             BuildKit.SetField(hud, "minimapRadiusPx", 152f);

@@ -36,11 +36,11 @@ namespace DeliveryBot.UI
             if (phase == DeliveryPhase.ToDropoff)
             {
                 SfxPlayer.Instance?.PlayPickup();
-                hud?.ShowToast($"픽업 완료! {target?.DisplayName} 으로 배달", new Color(0.4f, 0.9f, 1f));
+                hud?.ShowToast($"픽업 완료! {target?.DisplayName} 으로 배달하세요", new Color(0.4f, 0.9f, 1f));
             }
             else if (phase == DeliveryPhase.ToPickup && manager.Completed == 0 && manager.TotalTime < 2f)
             {
-                hud?.ShowToast($"새 주문: {target?.DisplayName} 에서 픽업", Color.white);
+                hud?.ShowToast($"새 주문: {target?.DisplayName} 에서 픽업 (도착 후 A/E)", Color.white);
             }
         }
 

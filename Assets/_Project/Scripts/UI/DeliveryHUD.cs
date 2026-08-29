@@ -19,6 +19,7 @@ namespace DeliveryBot.UI
         [SerializeField] private Text infoText;
         [SerializeField] private Text scoreText;
         [SerializeField] private Text speedText;
+        [SerializeField] private Text promptText;
 
         [Header("Widgets")]
         [SerializeField] private RectTransform arrow;
@@ -54,14 +55,17 @@ namespace DeliveryBot.UI
         private void UpdateTexts()
         {
             var name = manager.Target != null ? manager.Target.DisplayName : "-";
+            var category = manager.Target != null && !string.IsNullOrEmpty(manager.Target.Category) ? $" ({manager.Target.Category})" : "";
             var title = manager.Phase switch
             {
-                DeliveryPhase.ToPickup => $"📦 픽업 → {name}",
-                DeliveryPhase.ToDropoff => $"🚚 배달 → {name}",
+                DeliveryPhase.ToPickup => $"픽업 → {name}{category}",
+                DeliveryPhase.ToDropoff => $"배달 → {name}",
                 _ => "주문 대기 중"
             };
             if (titleText != null) titleText.text = title;
-            if (infoText != null) infoText.text = $"{manager.DistanceToTarget:F0} m   ⏱ {manager.ElapsedThisJob:F0}초";
+            var from = manager.Phase == DeliveryPhase.ToDropoff && manager.Pickup != null ? $"   {manager.Pickup.DisplayName} 주문" : "";
+            if (infoText != null) infoText.text = $"{manager.DistanceToTarget:F0} m   {manager.ElapsedThisJob:F0}초{from}";
+            UpdatePrompt();
             if (scoreText != null)
                 scoreText.text = $"완료 {manager.Completed}건   페널티 {manager.Penalties}회 (+{manager.PenaltyTime:F0}초)   총 {manager.TotalTime:F0}초";
             if (speedText != null)
@@ -70,6 +74,15 @@ namespace DeliveryBot.UI
                 var view = cameraRig != null && cameraRig.Mode == ViewMode.FirstPerson ? "1인칭" : "3인칭";
                 speedText.text = $"{kmh:F0} km/h\n[V] {view}";
             }
+        }
+
+        private void UpdatePrompt()
+        {
+            if (promptText == null) return;
+            var atTarget = manager.InRangePoint != null && manager.InRangePoint == manager.Target;
+            if (!atTarget) { promptText.text = ""; return; }
+            var action = manager.Phase == DeliveryPhase.ToPickup ? "픽업하기" : "문 앞에 놓기";
+            promptText.text = manager.RobotSlowEnough ? $"[A] / [E]  {action}" : "천천히 멈춘 뒤  [A] / [E]";
         }
 
         private void UpdateArrowAndBlip()

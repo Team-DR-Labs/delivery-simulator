@@ -116,6 +116,9 @@ namespace DeliveryBot.Vehicle
             Impacted?.Invoke(collision);
         }
 
+        /// <summary>Input currently driving the robot (scripted override if set, else the live provider).</summary>
+        public IDriveInput InputSource => _override ?? (IDriveInput)input;
+
         /// <summary>Replaces the live input with a scripted source (tests, cutscenes). Pass null to restore.</summary>
         public void SetInputSource(IDriveInput source) => _override = source;
 

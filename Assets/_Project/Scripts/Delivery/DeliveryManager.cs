@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DeliveryBot.Input;
 using DeliveryBot.Vehicle;
 using DeliveryBot.World;
 using UnityEngine;
@@ -9,8 +10,8 @@ namespace DeliveryBot.Delivery
     public enum DeliveryPhase { Idle, ToPickup, ToDropoff }
 
     /// <summary>
-    /// Core loop: random spawn → random pickup (far enough) → random drop-off (far enough) → score → repeat.
-    /// Collisions with traffic/pedestrians add time penalties. Fires events for HUD/feedback; owns no UI.
+    /// Core loop: random spawn → pick up at a shop (press Interact in range) → deliver to a home
+    /// (press Interact in range) → score → repeat. Collisions add time penalties. Owns no UI.
     /// </summary>
     public sealed class DeliveryManager : MonoBehaviour
     {
@@ -25,17 +26,26 @@ namespace DeliveryBot.Delivery
         [SerializeField] private bool randomSpawn = true;
         [SerializeField] private float minPickupDistance = 35f;
         [SerializeField] private float minDropoffDistance = 70f;
+        [SerializeField] private float maxInteractSpeed = 2.5f;
         [SerializeField] private float trafficPenaltySeconds = 5f;
         [SerializeField] private float pedestrianPenaltySeconds = 5f;
         [SerializeField] private float wallPenaltySeconds = 2f;
         [SerializeField] private float wallPenaltyMinSpeed = 4f;
 
         private readonly System.Random _rng = new System.Random();
-        private readonly List<Vector3> _positions = new List<Vector3>();
-        private int _targetIndex = -1;
+        private readonly List<DeliveryPoint> _shops = new List<DeliveryPoint>();
+        private readonly List<DeliveryPoint> _homes = new List<DeliveryPoint>();
+        private readonly List<Vector3> _shopPositions = new List<Vector3>();
+        private readonly List<Vector3> _homePositions = new List<Vector3>();
+        private DeliveryPoint _lastShop, _lastHome;
 
         public DeliveryPhase Phase { get; private set; } = DeliveryPhase.Idle;
         public DeliveryPoint Target { get; private set; }
+        public DeliveryPoint Pickup { get; private set; }
+        /// <summary>The point whose trigger currently contains the robot (null if none).</summary>
+        public DeliveryPoint InRangePoint { get; private set; }
+        public bool CanInteract => InRangePoint != null && InRangePoint == Target && RobotSlowEnough;
+        public bool RobotSlowEnough => robotController == null || Mathf.Abs(robotController.ForwardSpeed) <= maxInteractSpeed;
         public int Completed { get; private set; }
         public int Penalties { get; private set; }
         public float PenaltyTime { get; private set; }
@@ -57,8 +67,18 @@ namespace DeliveryBot.Delivery
                 robot = player != null ? player.transform : null;
             }
             if (robotController == null && robot != null) robotController = robot.GetComponent<RobotController>();
-            _positions.Clear();
-            foreach (var p in points) _positions.Add(p != null ? p.transform.position : Vector3.zero);
+            IndexPoints();
+        }
+
+        private void IndexPoints()
+        {
+            _shops.Clear(); _homes.Clear(); _shopPositions.Clear(); _homePositions.Clear();
+            foreach (var p in points)
+            {
+                if (p == null) continue;
+                if (p.Kind == PointKind.Shop) { _shops.Add(p); _shopPositions.Add(p.transform.position); }
+                else { _homes.Add(p); _homePositions.Add(p.transform.position); }
+            }
         }
 
         private void Start()
@@ -79,6 +99,9 @@ namespace DeliveryBot.Delivery
             if (Phase == DeliveryPhase.Idle) return;
             ElapsedThisJob += Time.deltaTime;
             TotalTime += Time.deltaTime;
+
+            var input = robotController != null ? robotController.InputSource : null;
+            if (input != null && input.Current.Interact) TryInteract();
         }
 
         private void SpawnRobotRandomly()
@@ -93,36 +116,48 @@ namespace DeliveryBot.Delivery
             robotController.Place(pos, Quaternion.LookRotation(g.EdgeDirection(node, next), Vector3.up));
         }
 
-        public void OnRobotEntered(DeliveryPoint point)
+        public void SetRobotInRange(DeliveryPoint point, bool inRange)
         {
-            if (point != Target) return;
+            if (inRange) InRangePoint = point;
+            else if (InRangePoint == point) InRangePoint = null;
+        }
 
+        /// <summary>Called on the Interact button; completes the current step if the robot is at the target.</summary>
+        public bool TryInteract()
+        {
+            if (!CanInteract) return false;
             if (Phase == DeliveryPhase.ToPickup)
             {
-                var idx = JobPicker.Pick(_positions, point.transform.position, minDropoffDistance, _targetIndex, _rng);
-                SetTarget(DeliveryPhase.ToDropoff, idx, dropoffColor);
+                Pickup = Target;
+                _lastShop = Target;
+                var idx = JobPicker.Pick(_homePositions, Target.transform.position, minDropoffDistance, _homes.IndexOf(_lastHome), _rng);
+                SetTarget(DeliveryPhase.ToDropoff, idx >= 0 ? _homes[idx] : null, dropoffColor);
+                return true;
             }
-            else if (Phase == DeliveryPhase.ToDropoff)
+            if (Phase == DeliveryPhase.ToDropoff)
             {
+                _lastHome = Target;
                 Completed++;
                 DeliveryCompleted?.Invoke(Completed, ElapsedThisJob);
                 StartNewJob();
+                return true;
             }
+            return false;
         }
 
         private void StartNewJob()
         {
             ElapsedThisJob = 0f;
+            Pickup = null;
             var from = robot != null ? robot.position : Vector3.zero;
-            var idx = JobPicker.Pick(_positions, from, minPickupDistance, _targetIndex, _rng);
-            SetTarget(DeliveryPhase.ToPickup, idx, pickupColor);
+            var idx = JobPicker.Pick(_shopPositions, from, minPickupDistance, _shops.IndexOf(_lastShop), _rng);
+            SetTarget(DeliveryPhase.ToPickup, idx >= 0 ? _shops[idx] : null, pickupColor);
         }
 
-        private void SetTarget(DeliveryPhase phase, int index, Color color)
+        private void SetTarget(DeliveryPhase phase, DeliveryPoint point, Color color)
         {
             if (Target != null) Target.SetMarkerVisible(false);
-            _targetIndex = index;
-            Target = index >= 0 && index < points.Count ? points[index] : null;
+            Target = point;
             Phase = Target != null ? phase : DeliveryPhase.Idle;
             if (Target != null)
             {
@@ -149,7 +184,11 @@ namespace DeliveryBot.Delivery
             PenaltyAdded?.Invoke(seconds, reason);
         }
 
-        public void SetPoints(IEnumerable<DeliveryPoint> newPoints) => points = new List<DeliveryPoint>(newPoints);
+        public void SetPoints(IEnumerable<DeliveryPoint> newPoints)
+        {
+            points = new List<DeliveryPoint>(newPoints);
+            IndexPoints();
+        }
 
         public void SetRobot(Transform t)
         {

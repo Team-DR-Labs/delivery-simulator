@@ -8,8 +8,10 @@ namespace DeliveryBot.Input
         public float Brake;
         public bool Reverse;
         public bool Handbrake;
+        /// <summary>Set true for exactly one frame to simulate an Interact press.</summary>
+        public bool Interact;
 
-        public DriveInputState Current => new DriveInputState(Steer, Throttle, Brake, Reverse, Handbrake, false, false);
+        public DriveInputState Current => new DriveInputState(Steer, Throttle, Brake, Reverse, Handbrake, Interact, false);
         public string ActiveSourceName => "scripted";
     }
 }

@@ -13,7 +13,7 @@ namespace DeliveryBot.Traffic
         [SerializeField] private Transform body;
         [SerializeField] private GameObject alertBubble;
         [SerializeField] private float walkSpeed = 1.3f;
-        [SerializeField] private float robotStopDistance = 2.6f;
+        [SerializeField] private float robotStopDistance = 2.2f;
 
         private Rigidbody _rb;
         private Vector3[] _loop;
@@ -74,11 +74,16 @@ namespace DeliveryBot.Traffic
             Animate(true);
         }
 
+        /// <summary>Stop only when the robot is close, in front, and actually heading at us.</summary>
         private bool RobotInFront()
         {
             if (_robot == null) return false;
             var rel = _robot.position - transform.position;
-            return rel.magnitude < robotStopDistance && Vector3.Dot(rel.normalized, transform.forward) > 0.3f;
+            if (rel.magnitude > robotStopDistance || Vector3.Dot(rel.normalized, transform.forward) < 0.3f) return false;
+            var rb = _robot.GetComponent<Rigidbody>();
+            if (rb == null) return true;
+            var v = rb.linearVelocity;
+            return v.magnitude > 0.5f && Vector3.Dot(v.normalized, -rel.normalized) > 0.3f;
         }
 
         private void Animate(bool walking)

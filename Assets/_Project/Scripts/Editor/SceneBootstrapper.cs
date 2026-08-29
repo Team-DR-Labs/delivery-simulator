@@ -25,7 +25,6 @@ namespace DeliveryBot.EditorTools
         private const float LaneOffset = 2.6f;
         private const float SidewalkWidth = 2.5f;
         private const float SidewalkHeight = 0.12f;
-        private const int DeliveryPointCount = 30;
         private const float MinimapOrthoSize = 45f;
 
         [MenuItem("DeliveryBot/Build City Scene")]
@@ -47,7 +46,8 @@ namespace DeliveryBot.EditorTools
             var layout = cityGo.AddComponent<CityLayout>();
             layout.Configure(Blocks, BlockSize, RoadWidth, LaneOffset, SidewalkWidth, SidewalkHeight);
             var graph = layout.Graph;
-            var parks = CityBuilder.Build(cityGo.transform, graph, rng, SidewalkHeight);
+            var pointsParent = new GameObject("DeliveryPoints").transform;
+            var points = CityBuilder.Build(cityGo.transform, pointsParent, graph, rng, SidewalkHeight);
 
             var robotPrefab = RobotFactory.CreatePrefab(profile);
             var carPrefabs = VehicleFactory.CreateCarPrefabs();
@@ -58,9 +58,6 @@ namespace DeliveryBot.EditorTools
 
             var rig = CreateCameraRig(robot.transform);
             CreateMinimapCamera(robot.transform, minimapRT);
-
-            var pointsParent = new GameObject("DeliveryPoints").transform;
-            var points = DeliveryPointFactory.Create(pointsParent, graph, parks, DeliveryPointCount, SidewalkHeight, rng);
 
             var managers = new GameObject("GameManager");
             var manager = managers.AddComponent<DeliveryManager>();
@@ -89,7 +86,8 @@ namespace DeliveryBot.EditorTools
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             PlayerSettings.productName = "DeliveryBotSim";
             AssetDatabase.SaveAssets();
-            Debug.Log($"[SceneBootstrapper] Built {ScenePath}: {points.Count} delivery points, {parks.Count} parks, {carPrefabs.Length} car prefabs");
+            var shops = points.FindAll(p => p.Kind == PointKind.Shop).Count;
+            Debug.Log($"[SceneBootstrapper] Built {ScenePath}: {shops} shops, {points.Count - shops} homes, {carPrefabs.Length} car prefabs");
         }
 
         private static T LoadOrCreate<T>(string path) where T : ScriptableObject
