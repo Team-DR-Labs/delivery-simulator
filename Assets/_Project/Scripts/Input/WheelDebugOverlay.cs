@@ -14,6 +14,7 @@ namespace DeliveryBot.Input
         [SerializeField] private bool expanded;
         [SerializeField] private bool statusLineInEditor = true;
         [SerializeField] private DriveInputProvider provider;
+        [SerializeField] private DeliveryBot.Vehicle.RobotController robot;
 
         private readonly StringBuilder _sb = new StringBuilder(2048);
         private GUIStyle _style;
@@ -21,6 +22,7 @@ namespace DeliveryBot.Input
 
         private void Update()
         {
+            if (robot == null && provider != null) robot = provider.GetComponent<DeliveryBot.Vehicle.RobotController>();
             var kb = Keyboard.current;
             if (kb == null) return;
             if (kb.f1Key.wasPressedThisFrame) expanded = !expanded;
@@ -41,7 +43,9 @@ namespace DeliveryBot.Input
                 var pad = provider.GamepadName;
                 var trig = provider.RawTriggers;
                 _sb.Append($"kb={(provider.KeyboardPresent ? "ok" : "NONE")} pad={(pad ?? "none")}{(pad != null ? $" LT={trig.x:F2} RT={trig.y:F2}" : "")} lastKey={_lastKey} src={provider.ActiveSourceName} ")
-                   .Append($"steer={c.Steer:F2} thr={c.Throttle:F2} brk={c.Brake:F2} rev={(c.Reverse ? 1 : 0)} hb={(c.Handbrake ? 1 : 0)}  [F1 detail]");
+                   .Append($"steer={c.Steer:F2} thr={c.Throttle:F2} brk={c.Brake:F2} rev={(c.Reverse ? 1 : 0)} hb={(c.Handbrake ? 1 : 0)}");
+                if (robot != null) _sb.Append($" | spd={robot.ForwardSpeed:F1} grounded={(robot.IsGrounded ? 1 : 0)}");
+                _sb.Append("  [F1 detail]");
             }
 
             if (expanded) AppendJoystickDetail();
@@ -57,6 +61,13 @@ namespace DeliveryBot.Input
             _sb.AppendLine("\n<b>All input devices</b>");
             foreach (var d in InputSystem.devices)
                 _sb.AppendLine($"  {d.displayName}  layout={d.layout}  {(d is Gamepad ? "[Gamepad]" : d is Joystick ? "[Joystick]" : "")}");
+
+            var pad = Gamepad.current;
+            if (pad != null)
+            {
+                _sb.AppendLine($"\n<b>{pad.displayName}</b> (layout={pad.layout}) pressed buttons: " +
+                    string.Join(" ", System.Linq.Enumerable.Select(System.Linq.Enumerable.Where(pad.allControls, ctl => ctl is UnityEngine.InputSystem.Controls.ButtonControl b && b.isPressed), ctl => ctl.name)));
+            }
 
             if (Joystick.all.Count == 0)
             {

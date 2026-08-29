@@ -73,8 +73,8 @@ namespace DeliveryBot.Input
 
             _kbThrottle = Axis("Throttle", "<Keyboard>/w", "<Keyboard>/upArrow", "<Gamepad>/rightTrigger");
             _kbBrake = Axis("Brake", "<Keyboard>/s", "<Keyboard>/downArrow", "<Gamepad>/leftTrigger");
-            _kbReverse = Button("Reverse", "<Keyboard>/leftShift", "<Keyboard>/rightShift", "<Gamepad>/buttonWest");
-            _kbHandbrake = Button("Handbrake", "<Keyboard>/space", "<Gamepad>/buttonEast");
+            _kbReverse = Button("Reverse", "<Keyboard>/leftShift", "<Keyboard>/rightShift");
+            _kbHandbrake = Button("Handbrake", "<Keyboard>/space");
             _kbInteract = Button("Interact", "<Keyboard>/e", "<Gamepad>/buttonSouth");
             _kbView = Button("ToggleView", "<Keyboard>/v", "<Gamepad>/rightStickPress");
         }
@@ -139,8 +139,8 @@ namespace DeliveryBot.Input
 
             activeSource = "gamepad(direct)";
             return new DriveInputState(steerValue, rt, lt,
-                s.Reverse || pad.buttonWest.isPressed,
-                s.Handbrake || pad.buttonEast.isPressed,
+                s.Reverse,
+                s.Handbrake,
                 s.Interact || pad.buttonSouth.wasPressedThisFrame,
                 s.ToggleView || pad.rightStickButton.wasPressedThisFrame);
         }

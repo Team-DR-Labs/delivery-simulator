@@ -39,6 +39,8 @@ namespace DeliveryBot.Vehicle
 
         private Rigidbody _rb;
         private float _lastImpactTime = -10f;
+        private IDriveInput _override;
+        private float _speed; // integrated drive speed; not read back from physics so friction cannot eat the ramp-up
 
         public float ForwardSpeed { get; private set; }
         public bool IsGrounded { get; private set; }
@@ -57,17 +59,21 @@ namespace DeliveryBot.Vehicle
 
         private void FixedUpdate()
         {
-            var state = input != null ? input.Current : DriveInputState.None;
+            var source = _override ?? (IDriveInput)input;
+            var state = source != null ? source.Current : DriveInputState.None;
             IsGrounded = Physics.Raycast(transform.position + Vector3.up * 0.1f, Vector3.down, groundCheckDistance + 0.1f, groundMask, QueryTriggerInteraction.Ignore);
 
-            ForwardSpeed = Vector3.Dot(_rb.linearVelocity, transform.forward);
-            var newSpeed = ComputeNextSpeed(ForwardSpeed, state, Time.fixedDeltaTime);
+            var actual = Vector3.Dot(_rb.linearVelocity, transform.forward);
+            // Blocked by a wall/car: physics killed our velocity, so drop the integrated speed too.
+            if (Mathf.Abs(actual - _speed) > 0.6f) _speed = actual;
+            _speed = ComputeNextSpeed(_speed, state, Time.fixedDeltaTime);
+            ForwardSpeed = _speed;
 
             if (IsGrounded)
             {
                 var vertical = Vector3.Dot(_rb.linearVelocity, Vector3.up);
-                _rb.linearVelocity = transform.forward * newSpeed + Vector3.up * vertical;
-                ApplySteering(state.Steer, newSpeed, Time.fixedDeltaTime);
+                _rb.linearVelocity = transform.forward * _speed + Vector3.up * vertical;
+                ApplySteering(state.Steer, _speed, Time.fixedDeltaTime);
             }
         }
 
@@ -110,6 +116,9 @@ namespace DeliveryBot.Vehicle
             Impacted?.Invoke(collision);
         }
 
+        /// <summary>Replaces the live input with a scripted source (tests, cutscenes). Pass null to restore.</summary>
+        public void SetInputSource(IDriveInput source) => _override = source;
+
         /// <summary>Teleports the robot (used for random spawn).</summary>
         public void Place(Vector3 position, Quaternion rotation)
         {
@@ -119,6 +128,7 @@ namespace DeliveryBot.Vehicle
             _rb.rotation = rotation;
             _rb.linearVelocity = Vector3.zero;
             _rb.angularVelocity = Vector3.zero;
+            _speed = 0f;
         }
     }
 }

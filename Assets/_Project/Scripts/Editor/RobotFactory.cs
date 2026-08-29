@@ -68,6 +68,7 @@ namespace DeliveryBot.EditorTools
             var col = root.AddComponent<BoxCollider>();
             col.center = new Vector3(0f, 0.75f, 0f);
             col.size = new Vector3(1.15f, 1.5f, 1.65f);
+            col.sharedMaterial = FrictionlessMaterial(); // drive is velocity-based; ground friction must not fight it
 
             var rb = root.AddComponent<Rigidbody>();
             rb.mass = 60f;
@@ -87,6 +88,23 @@ namespace DeliveryBot.EditorTools
             BuildKit.SetField(cargoVisual, "cargo", cargoGo);
 
             return BuildKit.SavePrefab(root, "Robot");
+        }
+
+        private static PhysicsMaterial FrictionlessMaterial()
+        {
+            var path = $"{BuildKit.Root}/Settings/RobotPhysics.physicsMaterial";
+            var existing = UnityEditor.AssetDatabase.LoadAssetAtPath<PhysicsMaterial>(path);
+            if (existing != null) return existing;
+            var pm = new PhysicsMaterial("RobotPhysics")
+            {
+                dynamicFriction = 0f,
+                staticFriction = 0f,
+                bounciness = 0f,
+                frictionCombine = PhysicsMaterialCombine.Minimum,
+                bounceCombine = PhysicsMaterialCombine.Minimum
+            };
+            UnityEditor.AssetDatabase.CreateAsset(pm, path);
+            return pm;
         }
 
         private static void BuildWheel(Transform spin, Material tire, Material rim)

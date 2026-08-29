@@ -6,7 +6,7 @@
 
 1. Unity Hub → Open → 이 폴더 (Unity 6000.5.x)
 2. `Assets/_Project/Scenes/City.unity` 열고 ▶ Play
-3. **키가 안 먹으면 Game 뷰를 한 번 클릭**해서 키보드 포커스를 준다
+3. **키가 안 먹으면 Game 뷰를 한 번 클릭**해서 키보드 포커스를 준다 (게임패드는 포커스 없이도 동작)
 4. 씬을 다시 만들고 싶으면 메뉴 `DeliveryBot > Build City Scene`
 5. 패드/휠이 인식되는지 보려면 메뉴 `DeliveryBot > Log Input Devices` (Console에 출력)
 
@@ -17,8 +17,8 @@
 | 조향 | A/D, ←/→ | 왼쪽 스틱 | 핸들 축 |
 | 가속 | W, ↑ | RT | 액셀 페달 |
 | 브레이크 → 멈춘 뒤 계속 누르면 후진 | S, ↓ | LT | 브레이크 페달 |
-| 후진(누르고 가속) | Shift | X | button2 |
-| 핸드브레이크 | Space | B | button3 |
+| 후진 모드(누르고 가속) | Shift | – | button2 |
+| 핸드브레이크 | Space | – | button3 |
 | 시점 전환 (3인칭 ↔ 1인칭) | V | R스틱 클릭 | button4 |
 | 상호작용 | E | A | trigger |
 | 조작법 카드 | H | | |
@@ -62,5 +62,6 @@ Assets/_Project/
 UNITY=/Applications/Unity/Hub/Editor/6000.5.10f1-arm64/Unity.app/Contents/MacOS/Unity
 $UNITY -batchmode -nographics -quit -projectPath . -executeMethod DeliveryBot.EditorTools.SceneBootstrapper.Build
 $UNITY -batchmode -nographics -projectPath . -runTests -testPlatform EditMode -testResults results.xml
+$UNITY -batchmode -projectPath . -runTests -testPlatform PlayMode -testResults playmode.xml   # City 씬에서 실제 주행 검증
 $UNITY -batchmode -nographics -quit -projectPath . -buildWindows64Player Builds/Windows/DeliveryBotSim.exe
 ```
