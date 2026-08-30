@@ -79,8 +79,7 @@ namespace DeliveryBot.UI
         private void UpdatePrompt()
         {
             if (promptText == null) return;
-            var atTarget = manager.InRangePoint != null && manager.InRangePoint == manager.Target;
-            if (!atTarget) { promptText.text = ""; return; }
+            if (!manager.IsTargetInRange) { promptText.text = ""; return; }
             var action = manager.Phase == DeliveryPhase.ToPickup ? "픽업하기" : "문 앞에 놓기";
             promptText.text = manager.RobotSlowEnough ? $"[A] / [E]  {action}" : "천천히 멈춘 뒤  [A] / [E]";
         }

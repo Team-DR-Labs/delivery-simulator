@@ -65,10 +65,19 @@ namespace DeliveryBot.EditorTools
                 spinPivots.Add(spin.transform);
             }
 
+            // Body box sits above curb height; four sphere "wheels" carry the robot and roll over 12 cm curbs.
+            var physics = FrictionlessMaterial(); // drive is velocity-based; ground friction must not fight it
             var col = root.AddComponent<BoxCollider>();
-            col.center = new Vector3(0f, 0.75f, 0f);
-            col.size = new Vector3(1.15f, 1.5f, 1.65f);
-            col.sharedMaterial = FrictionlessMaterial(); // drive is velocity-based; ground friction must not fight it
+            col.center = new Vector3(0f, 0.95f, 0f);
+            col.size = new Vector3(1.15f, 1.1f, 1.65f);
+            col.sharedMaterial = physics;
+            foreach (var (x, z) in new[] { (-0.56f, 0.5f), (0.56f, 0.5f), (-0.56f, -0.5f), (0.56f, -0.5f) })
+            {
+                var wheelCol = root.AddComponent<SphereCollider>();
+                wheelCol.center = new Vector3(x, WheelRadius, z);
+                wheelCol.radius = WheelRadius;
+                wheelCol.sharedMaterial = physics;
+            }
 
             var rb = root.AddComponent<Rigidbody>();
             rb.mass = 60f;

@@ -92,6 +92,7 @@ namespace DeliveryBot.EditorTools
                         break;
                 }
                 points.AddRange(blockPoints);
+                BuildRamps(props, g, bx, bz, sidewalkHeight, blockPoints);
                 BuildBlockProps(props, g, bx, bz, rng, sidewalkHeight, blockPoints);
             }
             return points;
@@ -200,6 +201,33 @@ namespace DeliveryBot.EditorTools
             }
             PropFactory.Bench(parent, c + new Vector3(0f, sidewalkHeight, inner * 0.5f), 180f);
             PropFactory.Bench(parent, c + new Vector3(0f, sidewalkHeight, -inner * 0.5f), 0f);
+        }
+
+        /// <summary>Curb ramps in front of every doorstep and at both ends of each block side (crosswalk landings).</summary>
+        private static void BuildRamps(Transform parent, RoadGraph g, int bx, int bz, float sidewalkHeight, List<DeliveryPoint> blockPoints)
+        {
+            var c = g.BlockCenter(bx, bz);
+            var edge = g.BlockSize * 0.5f;
+            foreach (var p in blockPoints)
+            {
+                var facing = p.transform.forward;
+                var rel = p.transform.position - c;
+                var alongEdge = rel - facing * Vector3.Dot(rel, facing);
+                var curb = c + alongEdge + facing * edge;
+                curb.y = sidewalkHeight;
+                PropFactory.CurbRamp(parent, curb, facing, 3.2f, sidewalkHeight);
+            }
+            for (var side = 0; side < 4; side++)
+            {
+                var normal = RoadGraph.SideNormal(side);
+                var along = Vector3.Cross(Vector3.up, normal);
+                foreach (var sign in new[] { -1f, 1f })
+                {
+                    var curb = c + normal * edge + along * (sign * (edge - 1.6f));
+                    curb.y = sidewalkHeight;
+                    PropFactory.CurbRamp(parent, curb, normal, 2.6f, sidewalkHeight);
+                }
+            }
         }
 
         private static void BuildBlockProps(Transform parent, RoadGraph g, int bx, int bz, System.Random rng, float sidewalkHeight, List<DeliveryPoint> keepClear)

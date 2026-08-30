@@ -21,6 +21,26 @@ namespace DeliveryBot.EditorTools
             _bin = BuildKit.Mat("TrashBin", new Color(0.2f, 0.45f, 0.3f));
         }
 
+        /// <summary>
+        /// Sloped slab from road level up to the sidewalk. curbPos is on the curb line at sidewalk height,
+        /// outward points from the block into the road. Collider kept so the robot can drive up it.
+        /// </summary>
+        public static void CurbRamp(Transform parent, Vector3 curbPos, Vector3 outward, float width, float sidewalkHeight)
+        {
+            var sidewalkMat = BuildKit.Mat("Sidewalk", new Color(0.78f, 0.77f, 0.74f));
+            const float length = 1.8f;
+            const float thickness = 0.08f;
+            var roadTop = 0.02f;
+            var drop = sidewalkHeight - roadTop;
+            var angle = Mathf.Atan2(drop, length) * Mathf.Rad2Deg;
+            var root = BuildKit.Node("CurbRamp", parent, curbPos, isStatic: true);
+            root.transform.rotation = Quaternion.LookRotation(outward, Vector3.up);
+            // Local +z is outward and tilts downward; centre so the top surface meets the curb top and the road.
+            var centre = new Vector3(0f, -drop * 0.5f - thickness * 0.5f + 0.005f, length * 0.5f - 0.15f);
+            BuildKit.Prim(PrimitiveType.Cube, "Slope", root.transform, centre, new Vector3(width, thickness, length + 0.3f), sidewalkMat,
+                keepCollider: true, localRot: Quaternion.Euler(angle, 0f, 0f), isStatic: true);
+        }
+
         public static void Tree(Transform parent, Vector3 pos, System.Random rng)
         {
             var root = BuildKit.Node("Tree", parent, pos, isStatic: true);

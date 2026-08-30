@@ -56,7 +56,7 @@ namespace DeliveryBot.Tests
             _robot.Place(pos, Quaternion.LookRotation(-target.forward, Vector3.up));
             yield return new WaitForFixedUpdate();
             yield return new WaitForSeconds(0.3f);
-            Assert.AreEqual(_manager.Target, _manager.InRangePoint, "robot not detected in range of target");
+            Assert.IsTrue(_manager.IsTargetInRange, "robot not detected in range of target");
             yield return PressInteract();
         }
 

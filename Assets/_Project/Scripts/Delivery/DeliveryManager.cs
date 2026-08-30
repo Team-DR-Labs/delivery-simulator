@@ -38,13 +38,14 @@ namespace DeliveryBot.Delivery
         private readonly List<Vector3> _shopPositions = new List<Vector3>();
         private readonly List<Vector3> _homePositions = new List<Vector3>();
         private DeliveryPoint _lastShop, _lastHome;
+        private readonly HashSet<DeliveryPoint> _inRange = new HashSet<DeliveryPoint>();
 
         public DeliveryPhase Phase { get; private set; } = DeliveryPhase.Idle;
         public DeliveryPoint Target { get; private set; }
         public DeliveryPoint Pickup { get; private set; }
-        /// <summary>The point whose trigger currently contains the robot (null if none).</summary>
-        public DeliveryPoint InRangePoint { get; private set; }
-        public bool CanInteract => InRangePoint != null && InRangePoint == Target && RobotSlowEnough;
+        /// <summary>True while the robot is inside the current target's trigger (neighbouring doorsteps may overlap).</summary>
+        public bool IsTargetInRange => Target != null && _inRange.Contains(Target);
+        public bool CanInteract => IsTargetInRange && RobotSlowEnough;
         public bool RobotSlowEnough => robotController == null || Mathf.Abs(robotController.ForwardSpeed) <= maxInteractSpeed;
         public int Completed { get; private set; }
         public int Penalties { get; private set; }
@@ -118,8 +119,8 @@ namespace DeliveryBot.Delivery
 
         public void SetRobotInRange(DeliveryPoint point, bool inRange)
         {
-            if (inRange) InRangePoint = point;
-            else if (InRangePoint == point) InRangePoint = null;
+            if (inRange) _inRange.Add(point);
+            else _inRange.Remove(point);
         }
 
         /// <summary>Called on the Interact button; completes the current step if the robot is at the target.</summary>
