@@ -40,7 +40,7 @@
 ## G27 연결 시 할 일
 
 1. 휠 연결 → Play → F1 → 각 축/버튼 값이 라이브로 표시됨
-2. 핸들·페달을 움직여 어떤 경로(G27 실측: 핸들 `<Joystick>/stick/x`, 페달 `/z` `/rz` `/slider`는 뗀 값 +1, `stick/y`는 항상 0이라 페달로 쓰면 안 됨)가 무엇인지 확인
+2. 핸들·페달을 움직여 어떤 경로(G27 실측: 핸들 `<Joystick>/stick/x`, 액셀 `/rz`, 브레이크 `/z`, 클러치 `/slider`(뗀 값 +1), `stick/y`는 항상 0이라 페달로 쓰면 안 됨)가 무엇인지 확인
 3. `Assets/_Project/Settings/G27Profile.asset` 에서 경로·rest/pressed 값·회전 범위 수정 (코드 수정 불필요)
 4. 포스 피드백은 Windows 빌드에서 Logitech SDK로 별도 추가 예정 (`docs/plan.md`)
 

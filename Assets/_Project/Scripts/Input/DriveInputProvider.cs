@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.LowLevel;
 
 namespace DeliveryBot.Input
 {
@@ -25,26 +24,19 @@ namespace DeliveryBot.Input
         private InputAction _kbSteer, _kbThrottle, _kbBrake, _kbReverse, _kbHandbrake, _kbInteract, _kbView;
         private InputAction _wSteer, _wThrottle, _wBrake, _wReverse, _wHandbrake, _wInteract, _wView;
 
-        private double _enabledAtInputTime;
-
         public DriveInputState Current { get; private set; } = DriveInputState.None;
         public string ActiveSourceName => activeSource;
         public bool WheelConnected => Joystick.all.Count > 0;
 
         /// <summary>
-        /// True once the wheel has sent at least one HID report since this component was enabled.
-        /// Generic HID joysticks read 0 on every axis until their first report; for a pedal whose
-        /// rest value is 1 that 0 would normalize to 50% throttle and drive the robot on its own.
+        /// True once the wheel has delivered a real HID report. Until then every axis reads exactly 0
+        /// (a G27 at rest reports both pedals at +1, never both at 0), and 0 would normalize to 50%
+        /// throttle and drive the robot on its own. A time-based check (device.lastUpdateTime) is not
+        /// enough: the Input System stamps it on enable/domain reload before any report arrives.
         /// </summary>
-        public bool WheelReported
-        {
-            get
-            {
-                foreach (var joy in Joystick.all)
-                    if (joy.lastUpdateTime > _enabledAtInputTime) return true;
-                return false;
-            }
-        }
+        public bool WheelReported =>
+            _wThrottle != null && _wBrake != null &&
+            (_wThrottle.ReadValue<float>() != 0f || _wBrake.ReadValue<float>() != 0f);
         public bool KeyboardPresent => Keyboard.current != null;
         public string GamepadName => Gamepad.current != null ? Gamepad.current.displayName : null;
         /// <summary>Raw trigger values for the debug overlay (-1 when no gamepad).</summary>
@@ -60,7 +52,6 @@ namespace DeliveryBot.Input
 
         private void OnEnable()
         {
-            _enabledAtInputTime = InputState.currentTime;
             foreach (var a in AllActions()) a?.Enable();
         }
 
