@@ -19,12 +19,12 @@ MonoBehaviour:
     wheelRangeDegrees: 900
     usedRangeDegrees: 270
   throttle:
-    controlPath: <Joystick>/rz
+    controlPath: <Joystick>/z
     restValue: 1
     pressedValue: -1
     deadzone: 0.03
   brake:
-    controlPath: <Joystick>/z
+    controlPath: <Joystick>/rz
     restValue: 1
     pressedValue: -1
     deadzone: 0.03

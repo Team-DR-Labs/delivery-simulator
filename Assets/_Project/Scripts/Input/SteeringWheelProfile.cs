@@ -11,11 +11,11 @@ namespace DeliveryBot.Input
     {
         [Header("Axes")]
         public SteerAxisMapping steer = new SteerAxisMapping();
-        // G27 (Input System HID layout, measured 2026-09-05): wheel = stick/x, accelerator = rz, brake = z,
+        // G27 (Input System HID layout, measured 2026-09-05): wheel = stick/x, accelerator = z, brake = rz,
         // clutch = slider (all pedals rest at +1; stick/y stays 0 and must not be used as a pedal),
         // top-right rim button = button7.
-        public PedalAxisMapping throttle = new PedalAxisMapping { controlPath = "<Joystick>/rz" };
-        public PedalAxisMapping brake = new PedalAxisMapping { controlPath = "<Joystick>/z" };
+        public PedalAxisMapping throttle = new PedalAxisMapping { controlPath = "<Joystick>/z" };
+        public PedalAxisMapping brake = new PedalAxisMapping { controlPath = "<Joystick>/rz" };
         public PedalAxisMapping clutch = new PedalAxisMapping { controlPath = "<Joystick>/slider" };
 
         [Header("Buttons (Input System control paths)")]
