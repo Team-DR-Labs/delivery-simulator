@@ -23,6 +23,8 @@ namespace DeliveryBot.Delivery
         [SerializeField] private Color pickupColor = new Color(0.2f, 0.8f, 1f);
         [SerializeField] private Color dropoffColor = new Color(1f, 0.6f, 0.1f);
         [SerializeField] private float startDelay = 1f;
+        [Tooltip("Start the first job automatically after startDelay. GameFlow turns this off and calls BeginRound instead.")]
+        [SerializeField] private bool autoStart = true;
         [SerializeField] private bool randomSpawn = true;
         [SerializeField] private float minPickupDistance = 35f;
         [SerializeField] private float minDropoffDistance = 70f;
@@ -52,6 +54,8 @@ namespace DeliveryBot.Delivery
         public float PenaltyTime { get; private set; }
         public float ElapsedThisJob { get; private set; }
         public float TotalTime { get; private set; }
+        /// <summary>True between <see cref="BeginRound"/> and <see cref="EndRound"/> (or always, when autoStart is on).</summary>
+        public bool RoundActive { get; private set; }
         public float DistanceToTarget => Target != null && robot != null
             ? Vector3.Distance(robot.position, Target.transform.position) : 0f;
 
@@ -87,7 +91,36 @@ namespace DeliveryBot.Delivery
             foreach (var p in points) if (p != null) p.SetMarkerVisible(false);
             if (robotController != null) robotController.Impacted += OnRobotImpact;
             if (randomSpawn) SpawnRobotRandomly();
-            Invoke(nameof(StartNewJob), startDelay);
+            if (autoStart)
+            {
+                RoundActive = true;
+                Invoke(nameof(StartNewJob), startDelay);
+            }
+        }
+
+        /// <summary>Resets all counters and starts the first job immediately (synchronously, so tests can proceed).</summary>
+        public void BeginRound()
+        {
+            CancelInvoke(nameof(StartNewJob));
+            Completed = 0;
+            Penalties = 0;
+            PenaltyTime = 0f;
+            TotalTime = 0f;
+            ElapsedThisJob = 0f;
+            _lastShop = null;
+            _lastHome = null;
+            Pickup = null;
+            RoundActive = true;
+            StartNewJob();
+        }
+
+        /// <summary>Stops the loop: current job discarded, marker hidden, Phase back to Idle.</summary>
+        public void EndRound()
+        {
+            CancelInvoke(nameof(StartNewJob));
+            RoundActive = false;
+            Pickup = null;
+            SetTarget(DeliveryPhase.Idle, null, Color.clear);
         }
 
         private void OnDestroy()
@@ -126,7 +159,7 @@ namespace DeliveryBot.Delivery
         /// <summary>Called on the Interact button; completes the current step if the robot is at the target.</summary>
         public bool TryInteract()
         {
-            if (!CanInteract) return false;
+            if (!RoundActive || !CanInteract) return false;
             if (Phase == DeliveryPhase.ToPickup)
             {
                 Pickup = Target;

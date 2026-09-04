@@ -11,7 +11,7 @@ namespace DeliveryBot.EditorTools
     /// <summary>Builds the screen-space HUD: order card, minimap, arrow, speed, toast, flash, controls hint.</summary>
     public static class HudBuilder
     {
-        public static DeliveryHUD Build(DeliveryManager manager, GameObject robot, CameraRig rig, RenderTexture minimapRT, float minimapOrthoSize)
+        public static DeliveryHUD Build(DeliveryManager manager, GameObject robot, CameraRig rig, RenderTexture minimapRT, float minimapOrthoSize, GameFlow flow = null)
         {
             var canvasGo = new GameObject("HUD");
             var canvas = canvasGo.AddComponent<Canvas>();
@@ -57,6 +57,10 @@ namespace DeliveryBot.EditorTools
             var speed = Text(root, "Speed", font, 30, new Vector2(1f, 0f), new Vector2(-30f, 30f), new Vector2(260f, 80f));
             speed.alignment = TextAnchor.LowerRight;
 
+            // Round countdown (top-centre).
+            var timer = Text(root, "Timer", font, 52, new Vector2(0.5f, 1f), new Vector2(0f, -28f), new Vector2(600f, 70f), FontStyle.Bold);
+            timer.alignment = TextAnchor.UpperCenter;
+
             // Interaction prompt (above the arrow).
             var prompt = Text(root, "Prompt", font, 40, new Vector2(0.5f, 0f), new Vector2(0f, 230f), new Vector2(900f, 60f), FontStyle.Bold);
             prompt.alignment = TextAnchor.MiddleCenter;
@@ -97,7 +101,87 @@ namespace DeliveryBot.EditorTools
             BuildKit.SetField(hud, "minimapOrthoSize", minimapOrthoSize);
             BuildKit.SetField(hud, "flash", flash);
             BuildKit.SetField(hud, "toast", toast);
+            BuildKit.SetField(hud, "timerText", timer);
+            BuildKit.SetField(hud, "flow", flow);
+
+            // Menus last so they draw over everything else (sibling order = draw order).
+            BuildNicknamePanel(root, font, canvasGo, flow);
+            BuildResultsPanel(root, font, canvasGo, flow);
             return hud;
+        }
+
+        private static readonly Color DimColor = new Color(0.02f, 0.03f, 0.05f, 0.82f);
+        private static readonly Color CardColor = new Color(0.05f, 0.06f, 0.09f, 0.6f);
+        private static readonly Color AccentColor = new Color(1f, 0.6f, 0.1f);
+
+        private static void BuildNicknamePanel(Transform root, Font font, GameObject canvasGo, GameFlow flow)
+        {
+            var dim = Panel(root, "NameEntry", DimColor);
+            Stretch(dim.rectTransform);
+            var title = Text(dim.transform, "Title", font, 48, new Vector2(0.5f, 0.62f), Vector2.zero, new Vector2(1000f, 70f), FontStyle.Bold);
+            title.alignment = TextAnchor.MiddleCenter;
+            title.text = "닉네임을 입력하세요";
+            var name = Text(dim.transform, "Name", font, 64, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000f, 90f), FontStyle.Bold);
+            name.alignment = TextAnchor.MiddleCenter;
+            name.color = AccentColor;
+            var underline = Panel(dim.transform, "Underline", new Color(1f, 1f, 1f, 0.5f));
+            Place(underline.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -52f), new Vector2(640f, 3f));
+            var hint = Text(dim.transform, "Hint", font, 26, new Vector2(0.5f, 0.38f), Vector2.zero, new Vector2(1200f, 40f));
+            hint.alignment = TextAnchor.MiddleCenter;
+            hint.color = new Color(0.85f, 0.85f, 0.85f);
+
+            var comp = canvasGo.AddComponent<NicknamePanel>();
+            BuildKit.SetField(comp, "panel", dim.gameObject);
+            BuildKit.SetField(comp, "nameText", name);
+            BuildKit.SetField(comp, "hintText", hint);
+            BuildKit.SetField(comp, "flow", flow);
+        }
+
+        private static void BuildResultsPanel(Transform root, Font font, GameObject canvasGo, GameFlow flow)
+        {
+            var dim = Panel(root, "Results", DimColor);
+            Stretch(dim.rectTransform);
+            var title = Text(dim.transform, "Title", font, 48, new Vector2(0.5f, 0.9f), Vector2.zero, new Vector2(1000f, 70f), FontStyle.Bold);
+            title.alignment = TextAnchor.MiddleCenter;
+            title.text = "라운드 종료";
+            var summary = Text(dim.transform, "Summary", font, 30, new Vector2(0.5f, 0.82f), Vector2.zero, new Vector2(1200f, 44f));
+            summary.alignment = TextAnchor.MiddleCenter;
+            summary.color = AccentColor;
+
+            var card = Panel(dim.transform, "Card", CardColor);
+            Place(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -20f), new Vector2(900f, 560f));
+            var header = Text(card.transform, "Header", font, 24, new Vector2(0f, 1f), new Vector2(40f, -14f), new Vector2(820f, 34f));
+            header.text = "순위   닉네임";
+            header.color = new Color(0.7f, 0.7f, 0.7f);
+            var headerR = Text(card.transform, "HeaderR", font, 24, new Vector2(1f, 1f), new Vector2(-40f, -14f), new Vector2(400f, 34f));
+            headerR.alignment = TextAnchor.UpperRight;
+            headerR.text = "배달   마지막 배달 시각";
+            headerR.color = new Color(0.7f, 0.7f, 0.7f);
+
+            var rowLeft = new Text[Leaderboard.TopCount];
+            var rowRight = new Text[Leaderboard.TopCount];
+            for (var i = 0; i < Leaderboard.TopCount; i++)
+            {
+                var y = -56f - i * 48f;
+                rowLeft[i] = Text(card.transform, $"RowL{i}", font, 30, new Vector2(0f, 1f), new Vector2(40f, y), new Vector2(520f, 44f));
+                rowRight[i] = Text(card.transform, $"RowR{i}", font, 30, new Vector2(1f, 1f), new Vector2(-40f, y), new Vector2(400f, 44f));
+                rowRight[i].alignment = TextAnchor.UpperRight;
+            }
+
+            var footer = Text(dim.transform, "Footer", font, 28, new Vector2(0.5f, 0.1f), Vector2.zero, new Vector2(1200f, 40f));
+            footer.alignment = TextAnchor.MiddleCenter;
+            footer.color = new Color(1f, 0.95f, 0.6f);
+            footer.gameObject.AddComponent<UiPulse>();
+            BuildKit.SetField(footer.GetComponent<UiPulse>(), "amplitude", 0.03f);
+
+            var comp = canvasGo.AddComponent<ResultsPanel>();
+            BuildKit.SetField(comp, "panel", dim.gameObject);
+            BuildKit.SetField(comp, "titleText", title);
+            BuildKit.SetField(comp, "summaryText", summary);
+            BuildKit.SetField(comp, "rowLeft", rowLeft);
+            BuildKit.SetField(comp, "rowRight", rowRight);
+            BuildKit.SetField(comp, "footerText", footer);
+            BuildKit.SetField(comp, "flow", flow);
         }
 
         private static Image Panel(Transform parent, string name, Color color)

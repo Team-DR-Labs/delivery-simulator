@@ -25,7 +25,7 @@ namespace DeliveryBot.Input
             if (robot == null && provider != null) robot = provider.GetComponent<DeliveryBot.Vehicle.RobotController>();
             var kb = Keyboard.current;
             if (kb == null) return;
-            if (kb.f1Key.wasPressedThisFrame) expanded = !expanded;
+            if (kb.f1Key.wasPressedThisFrame && !DeliveryBot.Delivery.GameFlow.MenuOpen) expanded = !expanded;
             foreach (var key in kb.allKeys)
                 if (key.wasPressedThisFrame) { _lastKey = key.name; break; }
         }

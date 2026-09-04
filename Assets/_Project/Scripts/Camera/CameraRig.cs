@@ -47,7 +47,9 @@ namespace DeliveryBot.CameraSystem
         private void LateUpdate()
         {
             if (target == null) return;
-            if (input != null && input.Current.ToggleView)
+            // Read through the robot so a scripted/frozen input source (menus, tests) also suppresses V.
+            var src = robot != null ? robot.InputSource : input;
+            if (src != null && src.Current.ToggleView)
                 mode = mode == ViewMode.ThirdPerson ? ViewMode.FirstPerson : ViewMode.ThirdPerson;
 
             if (mode == ViewMode.ThirdPerson) UpdateThirdPerson();

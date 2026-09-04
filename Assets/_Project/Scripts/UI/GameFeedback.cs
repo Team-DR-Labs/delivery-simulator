@@ -13,10 +13,13 @@ namespace DeliveryBot.UI
         [SerializeField] private DeliveryHUD hud;
         [SerializeField] private CameraRig cameraRig;
         [SerializeField] private Transform robot;
+        [SerializeField] private GameFlow flow;
 
         private void Start()
         {
             if (manager == null) manager = DeliveryManager.Instance;
+            if (flow == null) flow = GameFlow.Instance;
+            if (flow != null) flow.StateChanged += OnFlowState;
             if (manager == null) return;
             manager.PhaseChanged += OnPhaseChanged;
             manager.DeliveryCompleted += OnDelivered;
@@ -25,10 +28,22 @@ namespace DeliveryBot.UI
 
         private void OnDestroy()
         {
+            if (flow != null) flow.StateChanged -= OnFlowState;
             if (manager == null) return;
             manager.PhaseChanged -= OnPhaseChanged;
             manager.DeliveryCompleted -= OnDelivered;
             manager.PenaltyAdded -= OnPenalty;
+        }
+
+        private void OnFlowState(FlowState state)
+        {
+            if (state == FlowState.Playing)
+                hud?.ShowToast($"{flow.Nickname} 님, {flow.RoundSeconds:F0}초 시작!", Color.white);
+            else if (state == FlowState.Results)
+            {
+                SfxPlayer.Instance?.PlayDelivered();
+                hud?.ShowToast("시간 종료!", new Color(1f, 0.85f, 0.3f));
+            }
         }
 
         private void OnPhaseChanged(DeliveryPhase phase, DeliveryPoint target)
@@ -56,7 +71,8 @@ namespace DeliveryBot.UI
             SfxPlayer.Instance?.PlayBump();
             cameraRig?.Shake(1f);
             hud?.Flash(new Color(1f, 0.1f, 0.1f, 0.35f));
-            hud?.ShowToast($"{reason}! +{seconds:F0}초", new Color(1f, 0.35f, 0.3f));
+            var sign = flow != null ? "-" : "+";
+            hud?.ShowToast($"{reason}! {sign}{seconds:F0}초", new Color(1f, 0.35f, 0.3f));
         }
     }
 }

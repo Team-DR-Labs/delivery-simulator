@@ -5,6 +5,7 @@ using DeliveryBot.Input;
 using DeliveryBot.Minimap;
 using DeliveryBot.Traffic;
 using DeliveryBot.UI;
+using DeliveryBot.Vehicle;
 using DeliveryBot.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -26,6 +27,7 @@ namespace DeliveryBot.EditorTools
         private const float SidewalkWidth = 2.5f;
         private const float SidewalkHeight = 0.12f;
         private const float MinimapOrthoSize = 45f;
+        private const float RoundSeconds = 180f;
 
         [MenuItem("DeliveryBot/Build City Scene")]
         public static void Build()
@@ -63,6 +65,11 @@ namespace DeliveryBot.EditorTools
             var manager = managers.AddComponent<DeliveryManager>();
             manager.SetPoints(points);
             manager.SetRobot(robot.transform);
+            BuildKit.SetField(manager, "autoStart", false);
+            var flow = managers.AddComponent<GameFlow>();
+            BuildKit.SetField(flow, "manager", manager);
+            BuildKit.SetField(flow, "robot", robot.GetComponent<RobotController>());
+            BuildKit.SetField(flow, "roundSeconds", RoundSeconds);
             managers.AddComponent<GameBootstrap>();
             managers.AddComponent<SfxPlayer>();
             var overlay = managers.AddComponent<WheelDebugOverlay>();
@@ -72,13 +79,15 @@ namespace DeliveryBot.EditorTools
             var pedestrians = managers.AddComponent<PedestrianSpawner>();
             pedestrians.SetPrefab(pedestrianPrefab);
 
-            var hud = HudBuilder.Build(manager, robot, rig, minimapRT, MinimapOrthoSize);
+            var hud = HudBuilder.Build(manager, robot, rig, minimapRT, MinimapOrthoSize, flow);
             var feedback = managers.AddComponent<GameFeedback>();
             BuildKit.SetField(feedback, "manager", manager);
+            BuildKit.SetField(feedback, "flow", flow);
             BuildKit.SetField(feedback, "hud", hud);
             BuildKit.SetField(feedback, "cameraRig", rig);
             BuildKit.SetField(feedback, "robot", robot.transform);
             EditorUtility.SetDirty(manager);
+            EditorUtility.SetDirty(flow);
             EditorUtility.SetDirty(traffic);
             EditorUtility.SetDirty(pedestrians);
 

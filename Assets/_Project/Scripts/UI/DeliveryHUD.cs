@@ -13,6 +13,7 @@ namespace DeliveryBot.UI
         [SerializeField] private Transform robot;
         [SerializeField] private RobotController robotController;
         [SerializeField] private CameraRig cameraRig;
+        [SerializeField] private GameFlow flow;
 
         [Header("Texts")]
         [SerializeField] private Text titleText;
@@ -20,6 +21,8 @@ namespace DeliveryBot.UI
         [SerializeField] private Text scoreText;
         [SerializeField] private Text speedText;
         [SerializeField] private Text promptText;
+        [SerializeField] private Text timerText;
+        [SerializeField] private Color timerWarning = new Color(1f, 0.35f, 0.3f);
 
         [Header("Widgets")]
         [SerializeField] private RectTransform arrow;
@@ -42,6 +45,7 @@ namespace DeliveryBot.UI
             }
             if (robotController == null && robot != null) robotController = robot.GetComponent<RobotController>();
             if (cameraRig == null) cameraRig = FindAnyObjectByType<CameraRig>();
+            if (flow == null) flow = FindAnyObjectByType<GameFlow>();
         }
 
         private void Update()
@@ -67,7 +71,18 @@ namespace DeliveryBot.UI
             if (infoText != null) infoText.text = $"{manager.DistanceToTarget:F0} m   {manager.ElapsedThisJob:F0}초{from}";
             UpdatePrompt();
             if (scoreText != null)
-                scoreText.text = $"완료 {manager.Completed}건   페널티 {manager.Penalties}회 (+{manager.PenaltyTime:F0}초)   총 {manager.TotalTime:F0}초";
+                scoreText.text = flow != null
+                    ? $"완료 {manager.Completed}건   페널티 {manager.Penalties}회 (-{manager.PenaltyTime:F0}초)"
+                    : $"완료 {manager.Completed}건   페널티 {manager.Penalties}회 (+{manager.PenaltyTime:F0}초)   총 {manager.TotalTime:F0}초";
+            if (timerText != null)
+            {
+                if (flow != null)
+                {
+                    timerText.text = $"남은 시간  {Leaderboard.FormatClock(flow.Remaining)}";
+                    timerText.color = flow.Timer != null && flow.Timer.IsWarning() ? timerWarning : Color.white;
+                }
+                else timerText.text = "";
+            }
             if (speedText != null)
             {
                 var kmh = robotController != null ? Mathf.Abs(robotController.ForwardSpeed) * 3.6f : 0f;
@@ -79,7 +94,7 @@ namespace DeliveryBot.UI
         private void UpdatePrompt()
         {
             if (promptText == null) return;
-            if (!manager.IsTargetInRange) { promptText.text = ""; return; }
+            if (!manager.IsTargetInRange || GameFlow.MenuOpen) { promptText.text = ""; return; }
             var action = manager.Phase == DeliveryPhase.ToPickup ? "픽업하기" : "문 앞에 놓기";
             promptText.text = manager.RobotSlowEnough ? $"[A] / [E]  {action}" : "천천히 멈춘 뒤  [A] / [E]";
         }
