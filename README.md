@@ -4,7 +4,7 @@
 
 ## 실행
 
-1. Unity Hub → Open → 이 폴더 (Unity 6000.5.x)
+1. Unity Hub → Open → 이 폴더 (Unity 6000.6.x)
 2. `Assets/_Project/Scenes/City.unity` 열고 ▶ Play
 3. **키가 안 먹으면 Game 뷰를 한 번 클릭**해서 키보드 포커스를 준다 (게임패드는 포커스 없이도 동작)
 4. 씬을 다시 만들고 싶으면 메뉴 `DeliveryBot > Build City Scene`
@@ -20,7 +20,7 @@
 | 후진 모드(누르고 가속) | Shift | – | button2 |
 | 핸드브레이크 | Space | – | button3 |
 | 시점 전환 (3인칭 ↔ 1인칭) | V | R스틱 클릭 | button4 |
-| 상호작용 | E | A | trigger |
+| 상호작용 | E | A | button7 (림 오른쪽 맨 위) |
 | 조작법 카드 | H | | |
 | 입력 디버그 오버레이 (연결된 모든 장치 표시) | F1 | | |
 | 재시작 | R | | |
@@ -35,7 +35,7 @@
 ## G27 연결 시 할 일
 
 1. 휠 연결 → Play → F1 → 각 축/버튼 값이 라이브로 표시됨
-2. 핸들·페달을 움직여 어떤 경로(`<Joystick>/stick/x`, `/rz`, `/slider` …)가 무엇인지 확인
+2. 핸들·페달을 움직여 어떤 경로(G27 실측: 핸들 `<Joystick>/stick/x`, 페달 `/z` `/rz` `/slider`는 뗀 값 +1, `stick/y`는 항상 0이라 페달로 쓰면 안 됨)가 무엇인지 확인
 3. `Assets/_Project/Settings/G27Profile.asset` 에서 경로·rest/pressed 값·회전 범위 수정 (코드 수정 불필요)
 4. 포스 피드백은 Windows 빌드에서 Logitech SDK로 별도 추가 예정 (`docs/plan.md`)
 

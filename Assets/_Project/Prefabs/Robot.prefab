@@ -599,7 +599,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 40d5266baea124d8d9d94d560d97ad24, type: 3}
   m_Name: 
   m_EditorClassIdentifier: DeliveryBot.Runtime::DeliveryBot.Input.DriveInputProvider
-  wheelProfile: {fileID: 0}
+  wheelProfile: {fileID: 11400000, guid: 738ca485d9c0a4741bff8b233a62b93a, type: 2}
   steer: 0
   throttle: 0
   brake: 0
