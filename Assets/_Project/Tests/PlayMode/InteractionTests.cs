@@ -23,8 +23,9 @@ namespace DeliveryBot.Tests
             yield return new WaitForSeconds(1.5f);
             _robot = Object.FindAnyObjectByType<RobotController>();
             _manager = DeliveryManager.Instance;
+            yield return RoundTestKit.BeginRound();
             _input = new ScriptedDriveInput();
-            _robot.SetInputSource(_input);
+            _robot.SetInputSource(_input); // after BeginRound: it resets the input override to the live provider
             Assert.AreEqual(DeliveryPhase.ToPickup, _manager.Phase);
             Assert.AreEqual(PointKind.Shop, _manager.Target.Kind, "first target must be a shop");
         }

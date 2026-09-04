@@ -22,6 +22,7 @@ namespace DeliveryBot.Tests
             _robot = Object.FindAnyObjectByType<RobotController>();
             Assert.IsNotNull(_robot, "Robot not found in City scene");
             yield return new WaitForSeconds(1.5f); // let DeliveryManager spawn the robot and physics settle
+            yield return RoundTestKit.BeginRound();
             // Deterministic road: remove traffic and pedestrians so nothing blocks the robot.
             foreach (var car in Object.FindObjectsByType<TrafficCar>()) Object.Destroy(car.gameObject);
             foreach (var ped in Object.FindObjectsByType<Pedestrian>()) Object.Destroy(ped.gameObject);

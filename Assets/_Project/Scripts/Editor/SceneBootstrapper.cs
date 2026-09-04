@@ -36,7 +36,6 @@ namespace DeliveryBot.EditorTools
             BuildKit.EnsureTag("Traffic");
             BuildKit.EnsureTag("Pedestrian");
 
-            var profile = LoadOrCreate<SteeringWheelProfile>($"{BuildKit.Root}/Settings/G27Profile.asset");
             var minimapRT = CreateRenderTexture();
             var skybox = CreateSkybox();
             var rng = new System.Random(20260828);
@@ -51,6 +50,9 @@ namespace DeliveryBot.EditorTools
             var pointsParent = new GameObject("DeliveryPoints").transform;
             var points = CityBuilder.Build(cityGo.transform, pointsParent, graph, rng, SidewalkHeight);
 
+            // Load right before use: an asset held only by a local variable across NewScene/CityBuilder's
+            // asset churn came back as a destroyed reference and the prefab's wheelProfile was saved as null.
+            var profile = LoadOrCreate<SteeringWheelProfile>($"{BuildKit.Root}/Settings/G27Profile.asset");
             var robotPrefab = RobotFactory.CreatePrefab(profile);
             var carPrefabs = VehicleFactory.CreateCarPrefabs();
             var pedestrianPrefab = VehicleFactory.CreatePedestrianPrefab();

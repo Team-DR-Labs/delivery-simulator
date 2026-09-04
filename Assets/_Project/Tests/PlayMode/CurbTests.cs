@@ -17,6 +17,7 @@ namespace DeliveryBot.Tests
         {
             yield return SceneManager.LoadSceneAsync("City", LoadSceneMode.Single);
             yield return new WaitForSeconds(1.5f);
+            yield return RoundTestKit.BeginRound();
         }
 
         [UnityTest]

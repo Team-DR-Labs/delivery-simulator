@@ -85,6 +85,7 @@ namespace DeliveryBot.EditorTools
             rb.angularDamping = 5f;
 
             var input = root.AddComponent<DriveInputProvider>();
+            if (profile == null) Debug.LogError("[RobotFactory] SteeringWheelProfile is null/destroyed — the robot prefab will ignore G27Profile.asset");
             BuildKit.SetField(input, "wheelProfile", profile);
             var controller = root.AddComponent<RobotController>();
             BuildKit.SetField(controller, "input", input);
